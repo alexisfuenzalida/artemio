@@ -1,0 +1,129 @@
+﻿@page "/seasons"
+
+@using ArtemioBlazorWA.Forms;
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject SeasonSerice _seasonService
+@inject IDialogService DialogService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject ISnackbar Snackbar
+
+<EntityGridPage T="SeasonModel"
+                 Title="Seasons"
+                 Items="@seasonList"
+                 IsLoading="@isLoading"
+                 @bind-SearchString="_searchString"
+                 QuickFilter="@_quickFilter"
+                 CreateLabel="Create"
+                 OnCreate="@(() => OpenDialog(new SeasonModel()))"
+                 EmptyMessage="No hay resultados.">
+    <Columns>
+            <PropertyColumn Property="x => x.SeasonId" Title="Id" />
+            <PropertyColumn Property="x => x.Season" Title="Season" />
+            <TemplateColumn CellClass="d-flex justify-center" Sortable="false" Filterable="false">
+                <CellTemplate>
+                    <MudStack Row>
+                     <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                         <MudMenuItem OnClick="@(() => OpenDialog(context.Item))" Icon="@Icons.Material.Filled.Edit" IconSize="Size.Small">Edit</MudMenuItem>
+                         <MudMenuItem OnClick="@(() => OnDelete(context.Item.SeasonId))" Icon="@Icons.Material.Filled.Delete" IconSize="Size.Small">Delete</MudMenuItem>
+                     </MudMenu>
+                 </MudStack>
+             </CellTemplate>
+         </TemplateColumn>
+    </Columns>
+</EntityGridPage>
+
+
+@code {
+    List<SeasonModel> seasonList = new();
+    private SeasonModel data = new();
+    private string _searchString;
+    private bool _sortNameByLength;
+    bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await localStorage.SetItemAsync<string>("last", "seasons");
+            isLoading = true;
+            seasonList = await _seasonService.GetAllAsync();
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenDialog(SeasonModel s)
+    {
+        var parameters = new DialogParameters<SeasonForm> { { x => x.season, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<SeasonForm>("Season", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            seasonList = await _seasonService.GetAllAsync();
+        }
+    }
+
+    private async void OnDelete(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete",
+            "Confirm to delete item?",
+            yesText: "Delete", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+
+                    var x = await _seasonService.DeleteAsync(id);
+                    seasonList = await _seasonService.GetAllAsync();
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Snackbar.Add("No se pudo eliminar el registro. Intenta nuevamente.", Severity.Error);
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private Func<SeasonModel, object> _sortBy => x =>
+    {
+        if (_sortNameByLength)
+            return x.Season.Length;
+        else
+            return x.Season;
+    };
+
+    private Func<SeasonModel, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.Season.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+}

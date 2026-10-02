@@ -1,0 +1,153 @@
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject ISnackbar Snackbar
+@inject PreInvoiceService _preInvoiceService
+@inject BookingService _bookingService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            Pre-Invoice
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <GridSkeleton />
+        }
+        else
+        {
+
+        <MudTable Items="@items" Hover="true" Breakpoint="Breakpoint.None" Loading="@isLoading" LoadingProgressColor="Color.Primary" Dense="true">
+            <HeaderContent>
+                <MudTh>Type</MudTh>
+                <MudTh>Amount</MudTh>
+                <MudTh>Delete</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Type">
+                    <MudText>@context.Type</MudText>
+                </MudTd>
+                <MudTd DataLabel="Amount">
+                    <MudNumericField Margin="Margin.Dense"
+                                     Variant="Variant.Outlined"
+                                     T="decimal"
+                                     @bind-Value="context.Amount"
+                                     HideSpinButtons="true"
+                                     Format="N2" />
+                </MudTd>
+                <MudTd DataLabel="Delete">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Color="Color.Error"
+                                   Size="Size.Small"
+                                   OnClick="@(() => RemoveItem(context))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+            }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Disabled="@(_processing || isLoading)" OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary">
+            @if (_processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Processing</MudText>
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public int BookingId { get; set; }
+
+    private List<PreInvoiceModel> items = new();
+    private bool _processing = false;
+    private bool isLoading = true;
+
+    private static readonly string[] Types = new[]
+    {
+        "INet",
+        "IRebate",
+        "IFeeShipper",
+        "IFeeIntermedary",
+        "IFeeArtemio",
+        "IComm",
+        "ILAR",
+        "ILARDoc"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+
+            var booking = await _bookingService.GetAsync(BookingId) ?? new BookingModel();
+            var existing = await _preInvoiceService.GetByBookingAsync(BookingId) ?? new List<PreInvoiceModel>();
+
+            // Una fila por cada tipo; monto guardado o del Booking (incluye 0)
+            items = Types
+                .Select(type => existing.FirstOrDefault(x => x.Type == type)
+                    ?? new PreInvoiceModel
+                    {
+                        Type = type,
+                        Amount = GetBookingAmount(booking, type),
+                        BookingId = BookingId
+                    })
+                .ToList();
+
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+            isLoading = false;
+            await Task.Delay(500);
+        }
+        isLoading = false;
+    }
+
+    private static decimal GetBookingAmount(BookingModel booking, string type) => type switch
+    {
+        "INet" => booking.Net,
+        "IRebate" => booking.Rebate,
+        "IFeeShipper" => booking.FeeShipper,
+        "IFeeIntermedary" => booking.FeeIntermediary,
+        "IFeeArtemio" => booking.FeeArtemio,
+        "IComm" => booking.ArtemioCom,
+        "ILAR" => booking.AmountLAR,
+        "ILARDoc" => booking.AmountLARDoc,
+        _ => 0
+    };
+
+    private void RemoveItem(PreInvoiceModel item)
+    {
+        items.Remove(item);
+        StateHasChanged();
+    }
+
+    private async Task Submit()
+    {
+        _processing = true;
+
+        await _preInvoiceService.DeleteByBookingAsync(BookingId);
+
+        foreach (var item in items)
+        {
+            item.BookingId = BookingId;
+            await _preInvoiceService.PostAsync(item);
+        }
+
+        _processing = false;
+        MudDialog.Close(true);
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}

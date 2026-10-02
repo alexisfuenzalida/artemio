@@ -1,0 +1,153 @@
+﻿@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+@using System.Globalization
+
+@inject BookingService _bookingService
+
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IJSRuntime js
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            Search Contract
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <FormSkeleton Rows="3" />
+        }
+        else
+        {
+
+        <MudGrid>
+            <MudItem xs="12">
+                <MudCard Elevation="2">
+                    <MudCardHeader Style="background-color: var(--mud-palette-background);">
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.body1">Contract Condition</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudItem xs="12">
+                            <MudTable Items="@bcList" Hover="true" Breakpoint="Breakpoint.Sm" LoadingProgressColor="Color.Primary">
+                                <HeaderContent>
+                                    <MudTh></MudTh>
+                                    <MudTh></MudTh>
+                                    <MudTh></MudTh>
+                                    <MudTh></MudTh>
+                                    <MudTh></MudTh>
+                                    <MudTh></MudTh>
+                                    <MudTh></MudTh>
+                                    <MudTh></MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="NroContract">
+                                        <MudTextField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.NroContract" Label="NroContract" ReadOnly="true" />
+                                    </MudTd>
+                                    <MudTd DataLabel="Shipper">
+                                        <MudTextField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.Shipper" Label="Shipper" ReadOnly="true" />
+                                    </MudTd>
+                                    <MudTd DataLabel="Intermediary">
+                                        <MudTextField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.Intermediary" Label="Intermediary" ReadOnly="true" />
+                                    </MudTd>
+                                    <MudTd DataLabel="Public">
+                                        <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.Public" Label="Public" ReadOnly="true" />
+                                    </MudTd>
+                                    <MudTd DataLabel="Net">
+                                        <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.Net" Label="Net" ReadOnly="true" />
+                                    </MudTd>
+                                    <MudTd DataLabel="FeeShipper">
+                                        <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.FeeShipper" Label="FeeShipper" ReadOnly="true" />
+                                    </MudTd>
+                                    <MudTd DataLabel="FeeIntermediary">
+                                        <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.FeeIntermediary" Label="FeeIntermediary" ReadOnly="true" />
+                                    </MudTd>
+                                    <MudTd DataLabel="Comm">
+                                        <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.Comm" Label="Comm" ReadOnly="true" />
+                                    </MudTd>
+
+                                    <MudTd DataLabel="ContractId">
+                                        <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.ContractId" Label="ContractId" ReadOnly="true" />
+                                    </MudTd>
+
+                                    <MudTd DataLabel="Remove">
+                                        <MudFab StartIcon="@Icons.Material.Filled.Check" Size="Size.Small" OnClick="@(() => Submit(context))" />
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        </MudItem>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+            }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public int POLId { get; set; } = 0;
+    [Parameter] public int PODId { get; set; } = 0;
+    [Parameter] public int TransportCompanyId { get; set; } = 0;
+
+    private List<BookingContractGridModel> bcList = new();
+
+    private int seasonId = 0;
+    private bool _processing = false;
+    private bool isLoading = true;
+    private Margin margin = Margin.Dense;
+    private bool _resetValueOnEmptyText = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var lst = new List<Task>();
+
+            var bcAsync = _bookingService.GetAllBookingContractAsync(POLId,PODId,TransportCompanyId);
+
+            lst.Add(bcAsync);
+
+            await Task.WhenAll(lst);
+
+            bcList = await bcAsync;
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+        isLoading = false;
+    }
+
+    private async Task Submit(BookingContractGridModel context)
+    {
+        _processing = true;
+
+        
+
+        _processing = false;
+        MudDialog.Close(context);
+    }
+
+    void Cancel() => MudDialog.Cancel();
+
+    private Snackbar _snackbar;
+
+    void Show(string msg, Severity severity)
+    {
+        Snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomCenter;
+        _snackbar = Snackbar.Add(msg, severity);
+    }
+}

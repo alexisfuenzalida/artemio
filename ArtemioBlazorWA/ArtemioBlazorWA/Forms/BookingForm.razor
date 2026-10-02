@@ -1,0 +1,1994 @@
+﻿@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+@using System.Globalization;
+
+@inject AgentService _agentService
+@inject AgentAduanaService _agentaduanaService
+@inject AgentEmbarqueService _agentembarqueService
+@inject BlIssuedService _blissuedService
+@inject BookingService _bookingService
+@inject BookingDtlService _bookingdtlService
+@inject BookingIncidenceService _bookingincidenceService
+@inject CommodityService _commodityService
+@inject ContainerTypeService _containertypeService
+@inject ContractTypeService _contracttypeService
+@inject IncotermService _incotermService
+@inject IntermediaryService _intermediaryService
+@inject PaymentConditionService _paymentconditionService
+@inject PortService _portService
+@inject ServiceService _serviceService
+@inject ShipperService _shipperService
+@inject StackingService _stackingService
+@inject TransportCompanyService _transportcompanyService
+@inject TransportService _transportService
+@inject TransportCompanyServiceService _transportcompanyserviceService
+@inject VesselService _vesselService
+@inject WarehouseService _warehouseService
+
+@inject ConsigneeService _consigneeService
+@inject NotifyService _notifyService
+@inject StatusContainerService _statuscontainerService
+@inject BookingLookupService _bookingLookupService
+
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <FormSkeleton Rows="8" Columns="4" />
+        }
+        else
+        {
+<MudForm @ref="form">
+
+        <MudExpansionPanels Elevation="5" Class="mt-1">
+            <MudExpansionPanel Text="Pre-Shipment"  Expanded="true">
+                <MudGrid>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudDatePicker Margin="margin" Variant="Variant.Outlined" Editable="true" Label="Booking Date" @bind-Date="booking.BookingDate" DateFormat="@dateFormat" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudDatePicker Margin="margin" Variant="Variant.Outlined" Editable="true" Label="Send Booking" @bind-Date="booking.SendEmailDate" DateFormat="@dateFormat" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudDatePicker Margin="margin" Variant="Variant.Outlined" Editable="true" Label="Upload Booking" @bind-Date="booking.UploadDate" DateFormat="@dateFormat" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudSelect Margin="margin" Variant="Variant.Outlined" T="string" @bind-Value="booking.BookingStatus" Label="Booking Status" AnchorOrigin="Origin.BottomCenter" Clearable="true">
+                            <MudSelectItem Value="@("Activo")" />
+                            <MudSelectItem Value="@("Pendiente")" />
+                            <MudSelectItem Value="@("Cancelado")" />
+                            <MudSelectItem Value="@("Siniestrado")" />
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Contract Co" @bind-Value="booking.ContractCo" />
+                    </MudItem>
+                    
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="TransportCompanyModel"
+                                                 Label="Ship. Company"
+                                                 SearchFunc="@SearchTransportCompany"
+
+                                                 Value="tc"
+                                                 ValueChanged="@OnTransportCompanySelected"
+                                                 Clearable
+                                                  ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                 ToStringFunc="@(tc => tc is null ? null : $"{tc.TransportCompany}")"
+                                                 Required="true"
+                                                 RequiredError="La naviera (Ship. Company) es obligatoria"
+                                                 CoerceText="false"
+                                                 CoerceValue="false" />
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab Margin="Margin.Dense" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => TransportCompanyOpenDialog(new TransportCompanyModel()))" />
+                            </MudItem>
+
+                        </MudGrid>
+                    </MudItem>
+                    
+
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="AgentModel"
+                                                 Label="Agent Carga"
+                                                 SearchFunc="@SearchAgent"
+                                                 @bind-Value="ag"
+                                                          Clearable
+                                                 ToStringFunc="@(ag=> ag is null ? null : $"{ag.Agent}")"
+                                                 CoerceText="false"
+                                                 ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                 CoerceValue="false" />
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => AgentOpenDialog(new AgentModel()))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+
+                     <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                         <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                             <MudItem xs="9">
+                                 <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="AgentModel"
+                                                  Label="Agent Embarque"
+                                                  SearchFunc="@SearchEmbAgent"
+                                                  @bind-Value="agEmb"
+                                                          Clearable
+                                                  ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                  ToStringFunc="@(ag=> ag is null ? null : $"{ag.Agent}")"
+                                                  CoerceText="false"
+                                                  CoerceValue="false" />
+                             </MudItem>
+                             <MudItem xs="3">
+                                 <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => AgentEmbOpenDialog(new AgentModel()))" />
+                             </MudItem>
+                         </MudGrid>
+                     </MudItem>
+
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="AgentModel"
+                                                 Label="Agent Aduana"
+                                                 SearchFunc="@SearchAgentAduana"
+                                 @bind-Value="agd"
+                                                          Clearable
+                                                  ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                 ToStringFunc="@(ag=> ag is null ? null : $"{ag.Agent}")"
+                                                 CoerceText="false"
+                                                 CoerceValue="false" />
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => AgentAduanaOpenDialog(new AgentModel()))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="IntermediaryModel"
+                                                 Label="Intermediary"
+                                                 SearchFunc="@SearchIntermediary"
+                                 @bind-Value="inter"
+                                                          Clearable
+                                                          ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                 ToStringFunc="@(inter=> inter is null ? null : $"{inter.Intermediary}")"
+                                                 CoerceText="false"
+                                                 CoerceValue="false" />
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => IntermediaryOpenDialog(new IntermediaryModel()))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="ContractTypeModel"
+                                                 Label="ContractType"
+                                                 SearchFunc="@SearchContractType"
+                                 @bind-Value="ct"
+                                                          Clearable
+                                                  ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                 ToStringFunc="@(tc=> tc is null ? null : $"{tc.ContractType}")"
+                                                 CoerceText="false"
+                                                 CoerceValue="false" />
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => ContractTypeOpenDialog(new ContractTypeModel()))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField Margin="margin" @bind-Value="booking.PoRef" Variant="Variant.Outlined" T="string" Label="PO / Ref." Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                 <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="ShipperModel"
+                                                  Label="Shipper"
+                                                  SearchFunc="@SearchShipper"
+                                 @bind-Value="sh"
+                                                          Clearable
+                                                          ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                  ToStringFunc="@(tc=> tc is null ? null : $"{tc.Shipper}")"
+                                                  Required="true"
+                                                  RequiredError="El shipper es obligatorio"
+                                                  CoerceText="false"
+                                                  CoerceValue="false" />
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => ShipperOpenDialog(new ShipperModel()))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="ServiceModel"
+                                                 Label="Service"
+                                                 SearchFunc="@SearchService"
+                                 @bind-Value="se"
+                                                          Clearable
+                                                          ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                 ToStringFunc="@(se=> se is null ? null : $"{se.Service}")"
+                                                 
+                                                 CoerceText="false"
+                                                 CoerceValue="false" />
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => ServiceOpenDialog(new ServiceModel()))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                 <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="VesselModel"
+                                                  Label="Vessel"
+                                                  SearchFunc="@SearchVessel"
+                                 @bind-Value="ve"
+                                                          Clearable
+                                                          ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                  ToStringFunc="@(se=> se is null ? null : $"{se.Vessel}")"
+                                                  Required="true"
+                                                  RequiredError="La nave (Vessel) es obligatoria"
+                                                  CoerceText="false"
+                                                  CoerceValue="false" />
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => VesselOpenDialog(new VesselModel()))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Voyage" @bind-Value="booking.Voyage" Clearable="true"/>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Nro Contract" @bind-Value="booking.NroContract" Clearable="true" />
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Search" Color="Color.Info" Size="Size.Small" OnClick="@(() => ContractOpenDialog(booking.POLId,booking.LastPODId,booking.TransportCompanyId))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Nro Request" @bind-Value="booking.NroRequest" Clearable="true"/>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                         <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Nro Booking" @bind-Value="booking.NroBooking" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                         <MudSelect Margin="margin" Variant="Variant.Outlined" T="string" Label="Adelanta Folio" @bind-Value="booking.AdelantoFolio" Required="true" RequiredError="Adelanta Folio is required!" Clearable="true">
+                            <MudSelectItem Value="@("Solicitado")" />
+                            <MudSelectItem Value="@("Pendiente")" />
+                            <MudSelectItem Value="@("N/A")" />
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                 <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="WarehouseModel"
+                                                  Label="Depot"
+                                                  SearchFunc="@SearchWarehouse"
+                                 @bind-Value="wa"
+                                                          Clearable
+                                                          ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                  ToStringFunc="@(se=> se is null ? null : $"{se.Warehouse}")"
+                                                  
+                                                  CoerceText="false"
+                                                  CoerceValue="false" />
+
+                                                  <!--
+                                <MudSelect Margin="margin" Variant="Variant.Outlined" T="int" Label="Depot" @bind-Value="booking.WarehouseId" Required="true" RequiredError="Depot is required!"
+                                           ToStringFunc="@(id => warehouseList.FirstOrDefault(w => w.WarehouseId == id)?.Warehouse)">
+                                    @foreach (WarehouseModel item in warehouseList)
+                                    {
+                                        <MudSelectItem T="int" Value="@item.WarehouseId">@item.Warehouse</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                                  -->
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => WarehouseOpenDialog(new WarehouseModel()))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                     <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                         <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                             <MudItem xs="9">
+                                 <MudTextField Margin="margin" Variant="Variant.Outlined" T="DateTime?" Format="s" Label="StackingFrom" InputType="InputType.DateTimeLocal" @bind-Value="booking.StackingFrom" Clearable="true" />
+                             </MudItem>
+                             <MudItem xs="3">
+                                 <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Search" Color="Color.Info" Size="Size.Small" OnClick="@(() => SearchStacking())" />
+                             </MudItem>
+                         </MudGrid>
+                     </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                         <MudTextField Margin="margin" Variant="Variant.Outlined" T="DateTime?" Format="s" Label="StackingTo" InputType="InputType.DateTimeLocal" @bind-Value="booking.StackingUntil" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField Margin="margin" Variant="Variant.Outlined" T="DateTime?" Format="s" Label="LAR" InputType="InputType.DateTimeLocal" @bind-Value="booking.LAR" Clearable="true"/>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                         <MudTextField Margin="margin" Variant="Variant.Outlined" T="DateTime?" Format="s" Label="LAR Doc" InputType="InputType.DateTimeLocal" @bind-Value="booking.LARDoc" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField Margin="margin" Variant="Variant.Outlined" T="DateTime?" Format="s" Label="Extra LAR" InputType="InputType.DateTimeLocal" @bind-Value="booking.ExtraLAR" Clearable="true"/>
+                    </MudItem>
+                     <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                         <MudTextField Margin="margin" Variant="Variant.Outlined" T="DateTime?" Format="s" Label="CutOf" InputType="InputType.DateTimeLocal" @bind-Value="booking.CutOf" Clearable="true" />
+                     </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudDatePicker Margin="margin" Variant="Variant.Outlined" Editable="true" Label="ETD" @bind-Date="booking.LastETD" DateFormat="@dateFormat" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudDatePicker Margin="margin" Variant="Variant.Outlined" Editable="true" Label="ETA" @bind-Date="booking.OriginalETA" DateFormat="@dateFormat" Clearable="true" />
+                    </MudItem>
+                     <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                         <MudDatePicker Margin="margin" Variant="Variant.Outlined" Editable="true" Label="LastETA" @bind-Date="booking.LastETA" DateFormat="@dateFormat" Clearable="true" />
+                     </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                <MudTextField Margin="margin" Variant="Variant.Outlined" T="int" Label="TT" @bind-Value="booking.TT" Clearable="true" />
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Search" Color="Color.Info" Size="Size.Small" OnClick="@(() => SearchTT())" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                 <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="PortModel"
+                                                  Label="POL"
+                                                  SearchFunc="@SearchPOL"
+                                 @bind-Value="pol"
+                                                          Clearable
+                                                          ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                  ToStringFunc="@(se=> se is null ? null : $"{se.Port}")"
+                                                  Required="true"
+                                                  RequiredError="El POL es obligatorio"
+                                                  CoerceText="false"
+                                                  CoerceValue="false" />
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => PortOpenDialog(new PortModel()))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                         <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Transport" @bind-Value="booking.Transport" Clearable="true" />
+                        <!--
+
+                        <MudSelect Variant="Variant.Outlined" T="string" Label="Transport" @bind-Value="booking.Transport" Required="true" RequiredError="Transport is required!">
+                            <MudSelectItem Value="@("Air")" />
+                            <MudSelectItem Value="@("Land")" />
+                            <MudSelectItem Value="@("Ocean")" />
+                        </MudSelect>
+                        -->
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                 <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="PortModel"
+                                                  Label="POD"
+                                                  SearchFunc="@SearchPOD"
+                                 @bind-Value="pod"
+                                                          Clearable
+                                                          ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                  ToStringFunc="@(se=> se is null ? null : $"{se.Port}")"
+                                                  Required="true"
+                                                  RequiredError="El POD es obligatorio"
+                                                  CoerceText="false"
+                                                  CoerceValue="false" />
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                    <MudMenuItem OnClick="@(() => PortOpenDialog(new PortModel()))" Icon="@Icons.Material.Filled.Add" IconSize="Size.Small">New Port</MudMenuItem>
+                                    <MudMenuItem OnClick="@(() => UpdatePODOpenDialog(booking.BookingId))" Icon="@Icons.Material.Filled.Update" IconSize="Size.Small">Update POD</MudMenuItem>
+                                </MudMenu>
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                         <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Delivery Place" @bind-Value="booking.DeliveryPlace" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Zip Code" @bind-Value="booking.ZipCode" Clearable="true"/>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                         <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Address" @bind-Value="booking.Address" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                         <MudTextField Margin="margin" Variant="Variant.Outlined" T="int" Label="Qty Containers Request" @bind-Value="booking.QtyContainers" OnBlur="@(_ => SyncContainerRows())" Clearable="true" />
+                    </MudItem>
+                     <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                         <MudTextField Margin="margin" Variant="Variant.Outlined" T="int" Label="Qty Containers Real" @bind-Value="booking.QtyContainersReal" Clearable="true" />
+                     </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="ContainerTypeModel"
+                                                  Label="Container Type"
+                                                  SearchFunc="@SearchContainerType"
+                                 @bind-Value="cont"
+                                                          Clearable
+                                                  ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                  ToStringFunc="@(se=> se is null ? null : $"{se.ContainerType}")"
+                                                  
+                                                  CoerceText="false"
+                                                  CoerceValue="false" />
+
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => ContainerTypeOpenDialog(new ContainerTypeModel()))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudCheckBox Margin="margin" T="bool" @bind-Value="@booking.ColdTreatment" Color="Color.Info">Cold Treatment</MudCheckBox>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                     <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="CommodityModel"
+                                                      Label="Commodity"
+                                                      SearchFunc="@SearchCommodity"
+                                 @bind-Value="com"
+                                                              Clearable
+                                                  ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                      ToStringFunc="@(se=> se is null ? null : $"{se.Commodity}")"
+                                                      CoerceText="false"
+                                                      CoerceValue="false" />
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => CommodityOpenDialog(new CommodityModel()))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="8">
+                                 <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="T°" @bind-Value="booking.Temperature" Clearable="true" />
+                            </MudItem>
+                            <MudItem xs="4">
+                                 <MudSelect Margin="margin" Variant="Variant.Outlined" T="string" Label="Unit" @bind-Value="booking.Unit" Clearable="true">
+                                    <MudSelectItem Value="@("°C")" />
+                                    <MudSelectItem Value="@("°F")" />
+                                </MudSelect>
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="8">
+                                <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="CBM" @bind-Value="booking.CBM" Clearable="true"/>
+                            </MudItem>
+                            <MudItem xs="4">
+                                 <MudTextField Margin="margin" Variant="Variant.Outlined" T="decimal" Label="%" @bind-Value="booking.PorcCBM" Clearable="true" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                     <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                         <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Humidity" @bind-Value="booking.Humidity" Clearable="true" />
+                     </MudItem>
+                </MudGrid>
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Shipment">
+                <MudGrid>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                 <MudSelect Margin="margin" Variant="Variant.Outlined" T="string" Label="Status BL" @bind-Value="booking.StatusBL" Clearable="true">
+                                    <MudSelectItem Value="@("Solicitado")" />
+                                    <MudSelectItem Value="@("OK")" />
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudCheckBox T="bool" Margin="margin" @bind-Checked="@booking.Roleo" Color="Color.Info">Roleo</MudCheckBox>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                         <MudSelect Margin="margin" Variant="Variant.Outlined" T="string" Label="Roleo By" @bind-Value="booking.RoleoBy" Clearable="true">
+                            <MudSelectItem Value="@("Shipper")" />
+                            <MudSelectItem Value="@("Cia Naviera")" />
+                            <MudSelectItem Value="@("Artemio")" />
+                            <MudSelectItem Value="@("Otros")" />
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudCheckBox T="bool"  Margin="margin" @bind-Checked="@booking.TruckArtemio" Color="Color.Info">Truck Artemio</MudCheckBox>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                         <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                             <MudItem xs="9">
+                                 <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="TransportModel"
+                                                Label="Transport Land"
+                                                SearchFunc="@SearchTransport"
+                                                @bind-Value="tra"
+                                                    Clearable
+                                                  ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                  ToStringFunc="@(se=> se is null ? null : $"{se.Transport}")"                                                  
+                                                  CoerceText="false"
+                                                  CoerceValue="false" />
+                             </MudItem>
+                             <MudItem xs="3">
+                                 <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => TransportOpenDialog(new TransportModel()))" />
+                             </MudItem>
+                         </MudGrid>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudCard Elevation="2">
+                            <MudCardHeader Style="background-color: var(--mud-palette-background);">
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.body1">Booking Details</MudText>
+                                </CardHeaderContent>
+                                <CardHeaderActions>
+                                    <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                         <MudMenuItem OnClick="@(() => ConsigneeOpenDialog(new ConsigneeModel()))" Icon="@Icons.Material.Filled.Add" IconSize="Size.Small">Add Consignee</MudMenuItem>
+                                         <MudMenuItem OnClick="@(() => NotifyOpenDialog(new NotifyModel()))" Icon="@Icons.Material.Filled.Add" IconSize="Size.Small">Add Notify</MudMenuItem>
+                                        <MudDivider Absolute="true" />
+                                         <MudMenuItem OnClick="@(() => AddRow(new BookingDetailModel()))" Icon="@Icons.Material.Filled.Add" IconSize="Size.Small">Add Row</MudMenuItem>
+                                         <MudMenuItem OnClick="@(() => RemoveDtl())" Icon="@Icons.Material.Filled.DeleteOutline" IconSize="Size.Small">Remove All Rows</MudMenuItem>
+                                    </MudMenu>
+                                </CardHeaderActions>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudItem xs="12">
+                                    <div style="overflow-x: auto; width: 100%;">
+                                        <MudTable Items="@listBookingDetails" Hover="true" Breakpoint="Breakpoint.None" LoadingProgressColor="Color.Primary">
+                                        <HeaderContent>
+                                            <MudTh></MudTh>
+                                            <MudTh></MudTh>
+                                            <MudTh></MudTh>
+                                            <MudTh></MudTh>
+                                            <MudTh></MudTh>
+                                            <MudTh></MudTh>
+                                            <MudTh></MudTh>
+                                                <MudTh></MudTh>
+                                        </HeaderContent>
+                                        <RowTemplate>
+                                            <MudTd DataLabel="Consignee">
+                                                    <div style="display: flex; gap: 4px; align-items: center;">
+                                                        <MudAutocomplete T="ConsigneeModel" Margin="margin" Variant="Variant.Outlined" Style="flex: 1;"
+                                                                         Value="@(consigneeList.FirstOrDefault(c => c.ConsigneeId == context.ConsigneeId))"
+                                                                         ValueChanged="@(newValue => ConsigneeChanged(newValue, context))"
+                                                                         SearchFunc="@SearchConsignees"
+                                                                         ToStringFunc="@(c => c.Consignee)"
+                                                                         Label="Consignee"
+                                                                         ResetValueOnEmptyText="true"
+                                                                         CoerceText="false"
+                                                                         CoerceValue="false"
+                                                                         Clearable />
+                                                        <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small"
+                                                                       OnClick="@(() => FillDownByColumn(context, "ConsigneeId"))" Title="Repetir Consignee hacia abajo" />
+                                                    </div>
+                                            </MudTd>
+                                            <MudTd DataLabel="Notify">
+                                                <div style="display: flex; gap: 4px; align-items: center;">
+                                                    <MudAutocomplete T="NotifyModel" Margin="margin" Variant="Variant.Outlined" Style="flex: 1;"
+                                                        Value="@(notifyList.FirstOrDefault(c => c.NotifyId == context.NotifyId))"
+                                                        ValueChanged="@(newValue => NotifyChanged(newValue, context))"
+                                                        SearchFunc="@SearchNotifies"
+                                                        ToStringFunc="@(c => c.Notify)"
+                                                        Label="Notify"
+                                                        ResetValueOnEmptyText="true"
+                                                        CoerceText="false"
+                                                        CoerceValue="false"
+                                                        Clearable />
+                                                    <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small"
+                                                        OnClick="@(() => FillDownByColumn(context, "NotifyId"))" Title="Repetir Notify hacia abajo" />
+                                                </div>
+                                            </MudTd>
+                                            <MudTd DataLabel="BL">
+                                                <div style="display: flex; gap: 4px; align-items: center;">
+                                                    <MudTextField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.BL" Label="BL" Clearable="true" Style="flex: 1;" />
+                                                    <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small"
+                                                        OnClick="@(() => FillDownByColumn(context, "BL"))" Title="Repetir BL hacia abajo" />
+                                                </div>
+                                            </MudTd>
+                                            <MudTd DataLabel="Container">
+                                                <div style="display: flex; gap: 4px; align-items: center;">
+                                                    <MudTextField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.Container" Label="Container" Clearable="true" Style="flex: 1;" />
+                                                    <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small"
+                                                        OnClick="@(() => FillDownByColumn(context, "Container"))" Title="Repetir Container hacia abajo" />
+                                                </div>
+                                            </MudTd>
+                                            <MudTd DataLabel="Cases">
+                                                <div style="display: flex; gap: 4px; align-items: center;">
+                                                    <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.Cases" Label="Cases" Clearable="true" Style="flex: 1;" />
+                                                    <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small"
+                                                        OnClick="@(() => FillDownByColumn(context, "Cases"))" Title="Repetir Cases hacia abajo" />
+                                                </div>
+                                            </MudTd>
+                                            <MudTd DataLabel="Status">
+                                                <div style="display: flex; gap: 4px; align-items: center;">
+                                                    <MudSelect Margin="margin" Variant="Variant.Outlined" T="int" Label="Status" @bind-Value="context.StatusContainerId" Required="true" RequiredError="Status Contaner is required!" Style="flex: 1;"
+                                                               ToStringFunc="@(id => statuscontainerList.FirstOrDefault(s => s.StatusContainerId == id)?.StatusContainer)">
+                                                        @foreach (var item in statuscontainerList)
+                                                        {
+                                                            <MudSelectItem T="int" Value="@item.StatusContainerId">@item.StatusContainer</MudSelectItem>
+                                                        }
+                                                    </MudSelect>
+                                                    <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small"
+                                                        OnClick="@(() => FillDownByColumn(context, "StatusContainerId"))" Title="Repetir Status hacia abajo" />
+                                                </div>
+                                            </MudTd>
+                                            <MudTd DataLabel="Comment">
+                                                <div style="display: flex; gap: 4px; align-items: center;">
+                                                    <MudTextField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.Comment" Label="Comment" Clearable="true" Style="flex: 1;" />
+                                                    <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small"
+                                                        OnClick="@(() => FillDownByColumn(context, "Comment"))" Title="Repetir Comment hacia abajo" />
+                                                </div>
+                                            </MudTd>
+                                            <MudTd DataLabel="Remove">
+                                                <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                                    <MudMenuItem OnClick="@(() => IncidenceOpenDialog(booking.BookingId,context.Container))" Icon="@Icons.Material.Filled.Add" IconSize="Size.Small">Add Incidences</MudMenuItem>
+                                                    <MudMenuItem OnClick="@(() => CommRebFeeOpenDialog(context))" Icon="@Icons.Material.Filled.Add" IconSize="Size.Small">Add Comm/Rbt/Fee</MudMenuItem>
+                                                    <MudMenuItem OnClick="@(() => RemoveDtl(context))" Icon="@Icons.Material.Filled.DeleteOutline" IconSize="Size.Small">Delete</MudMenuItem>
+                                                </MudMenu>
+                                            </MudTd>
+                                        </RowTemplate>
+                                    </MudTable>
+                                    </div>
+                                </MudItem>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid>
+                            <MudItem xs="9">
+                                <MudCheckBox T="bool" Margin="margin" @bind-Checked="@booking.COD">COD</MudCheckBox>
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="DUS" @bind-Value="booking.DUS" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField Margin="margin" Variant="Variant.Outlined" T="decimal" Label="Weight" @bind-Value="booking.Weight" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="BlIssuedModel"
+                                                 Label="BlIssued"
+                                                 SearchFunc="@SearchBlIssued"
+                                @bind-Value="bi"
+                                                          Clearable
+                                                  ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                 ToStringFunc="@(tc=> tc is null ? null : $"{tc.BlIssued}")"
+                                                 CoerceText="false"
+                                                 CoerceValue="false" />
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab  Margin="margin"StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => BlIssuedOpenDialog(new BlIssuedModel()))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+                                <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="IncotermModel"
+                                                 Label="Incoterm"
+                                                 SearchFunc="@SearchIncoterm"
+                                 @bind-Value="it"
+                                                          Clearable
+                                                  ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                 ToStringFunc="@(tc=> tc is null ? null : $"{tc.Incoterm}")"
+                                                 CoerceText="false"
+                                                 CoerceValue="false" />
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab  Margin="margin"StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => IncotermOpenDialog(new IncotermModel()))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField  Margin="margin"Variant="Variant.Outlined" T="int" Label="Request" @bind-Value="booking.FreeDaysPOD" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField Margin="margin" Variant="Variant.Outlined" T="decimal" Label="Public" @bind-Value="booking.Public" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField  Margin="margin"Variant="Variant.Outlined" T="decimal" Label="Net" @bind-Value="booking.Net" Clearable="true"/>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField Margin="margin" Variant="Variant.Outlined" T="decimal" Label="Rebate" @bind-Value="booking.Rebate" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField Margin="margin" Variant="Variant.Outlined" T="decimal" Label="Fee Shipper" @bind-Value="booking.FeeShipper" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField Margin="margin" Variant="Variant.Outlined" T="decimal" Label="Fee Intermediary" @bind-Value="booking.FeeIntermediary" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField Margin="margin" Variant="Variant.Outlined" T="decimal" Label="Fee Artemio" @bind-Value="booking.FeeArtemio" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField Margin="margin" Variant="Variant.Outlined" T="decimal" Label="Comm" @bind-Value="booking.ArtemioCom" Clearable="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                            <MudItem xs="9">
+
+                                <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="PaymentConditionModel"
+                                                 Label="PaymentCondition"
+                                                 SearchFunc="@SearchPaymentCondition"
+                                 @bind-Value="pc"
+                                                          Clearable
+                                                  ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                                 ToStringFunc="@(tc=> tc is null ? null : $"{tc.PaymentCondition}")"
+                                                 
+                                                 CoerceText="false"
+                                                 CoerceValue="false" />
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => PaymentConditionOpenDialog(new PaymentConditionModel()))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                </MudGrid>
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Post-Shipment">
+                <MudGrid>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Invoice LAR" @bind-Value="booking.InvoiceLAR" Clearable="true"/>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField  Margin="margin"Variant="Variant.Outlined" T="decimal" Label="Amount LAR" @bind-Value="booking.AmountLAR" Clearable="true"/>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField  Margin="margin"Variant="Variant.Outlined" T="string" Label="Invoice LAR Doc" @bind-Value="booking.InvoiceLARDoc" Clearable="true"/>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudTextField  Margin="margin"Variant="Variant.Outlined" T="decimal" Label="Amount LAR Doc" @bind-Value="booking.AmountLARDoc" Clearable="true"/>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                        <MudSelect Margin="margin" Variant="Variant.Outlined" T="string" Label="Release BL" @bind-Value="booking.ReleaseBL" Required="true" RequiredError="Release BL is required!" Clearable="true">
+                            <MudSelectItem Value="@("Pendiente")" />
+                            <MudSelectItem Value="@("En Proceso")" />
+                            <MudSelectItem Value="@("Liberado")" />
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Comments" @bind-Value="booking.Comments" Lines="10" Clearable="true" />
+                    </MudItem>
+                </MudGrid>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+            </MudForm>
+            }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Disabled="@_processing" OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary">
+            @if (_processing)
+            {
+                <MudProgressCircular Color="Color.Primary" Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Loading</MudText>
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public int id { get; set; } = 0;
+
+    private BookingModel booking = new BookingModel();
+    private List<BookingDetailModel> listBookingDetails = new List<BookingDetailModel>();
+    public BookingDetailModel bd = new();
+
+    private List<AgentModel> agentList = new();
+    private List<AgentModel> agentaduanaList = new();
+    private List<AgentModel> agentembList = new();
+    private List<BlIssuedModel> blissuedList = new();
+    private List<CommodityModel> commodityList = new();
+    private List<ContainerTypeModel> containertypeList = new();
+    private List<ContractTypeModel> contracttypeList = new();
+    private List<IncotermModel> incotermList = new();
+    private List<IntermediaryModel> intermediaryList = new();
+    private List<PaymentConditionModel> paymentconditionList = new();
+    private List<PortModel> portList = new();
+    private List<SeasonModel> seasonList = new();
+    private List<ServiceModel> serviceList = new();
+    private List<ShipperModel> shipperList = new();
+    private List<TransportModel> transportList = new();
+    private List<TransportCompanyModel> transportcompanyList = new();
+    private List<VesselModel> vesselList = new();
+    private List<WarehouseModel> warehouseList = new();
+
+    private List<ConsigneeModel> consigneeList = new();
+    private List<NotifyModel> notifyList = new();
+    private List<StatusContainerModel> statuscontainerList = new();
+
+    private int seasonId = 0;
+    private bool _processing = false;
+    private MudForm? form;
+    private bool isLoading = true;
+    private Margin margin = Margin.Dense;
+    private bool _resetValueOnEmptyText = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            seasonId = await localStorage.GetItemAsync<int>("season");
+
+            var lookups = await _bookingLookupService.LoadAsync();
+            agentList = lookups.Agents;
+            agentembList = lookups.AgentsEmbarque;
+            agentaduanaList = lookups.AgentsAduana;
+            blissuedList = lookups.BlIssued;
+            commodityList = lookups.Commodities;
+            containertypeList = lookups.ContainerTypes;
+            contracttypeList = lookups.ContractTypes;
+            incotermList = lookups.Incoterms;
+            intermediaryList = lookups.Intermediaries;
+            paymentconditionList = lookups.PaymentConditions;
+            portList = lookups.Ports;
+            serviceList = lookups.Services;
+            shipperList = lookups.Shippers;
+            transportList = lookups.Transports;
+            transportcompanyList = lookups.TransportCompanies;
+            vesselList = lookups.Vessels;
+            warehouseList = lookups.Warehouses;
+            consigneeList = lookups.Consignees;
+            notifyList = lookups.Notifies;
+            statuscontainerList = lookups.StatusContainers;
+
+            tc = transportcompanyList.Where(t => t.TransportCompanyId == booking.TransportCompanyId).FirstOrDefault() ?? new TransportCompanyModel();
+
+            if (id != 0)
+            {
+                booking = await _bookingService.GetAsync(id);
+
+                AgentInputChange(booking.AgentId);
+                AgentEmbInputChange(booking.AgentEmbarqueId);
+                AgentAduanaInputChange(booking.AgentAduanaId);
+                //BlIssuedInputChange(booking.BlIssuedId);
+                CommodityInputChange(booking.CommodityId);
+                ContainerTypeInputChange(booking.ContainerTypeId);
+                ContractTypeInputChange(booking.ContractTypeId);
+                //IncotermInputChange(booking.AgentId);
+                IntermediaryInputChange(booking.IntermediaryId);
+                //PaymentConditionInputChange(booking.AgentId);
+
+                TransportInputChange(booking.TransportId);
+                POLInputChange(booking.POLId);
+                PODInputChange(booking.LastPODId);
+
+                TransportCompanyInputChange(booking.TransportCompanyId);
+                serviceList = await _transportcompanyserviceService.GetAllAssignedAsync(booking.TransportCompanyId);
+
+                ServiceInputChange(booking.ServiceId);
+
+                ShipperInputChange(booking.ShipperId);
+                VesselInputChange(booking.VesselId);
+                WarehouseInputChange(booking.WarehouseId);
+
+                BlIssuedInputChange(booking.BlIssuedId);
+                IncotermInputChange(booking.IncotermId);
+                PaymentConditionInputChange(booking.PaymentConditionId);
+
+                listBookingDetails = await _bookingdtlService.GetAsync(id);
+                if (listBookingDetails == null)
+                {
+                    listBookingDetails = new List<BookingDetailModel>();
+                }
+                SyncContainerRows(allowClear: false);
+
+                //Console.WriteLine("a");
+            }
+            else
+            {
+                booking = new BookingModel();
+                listBookingDetails.Clear();
+                /*
+                * 
+                * 
+                booking.AgentId = agentList.FirstOrDefault().AgentId;
+                booking.BlIssuedId = blissuedList.FirstOrDefault().BlIssuedId;
+                booking.CommodityId = commodityList.FirstOrDefault().CommodityId;
+                booking.ContainerTypeId = containertypeList.FirstOrDefault().ContainerTypeId;
+                booking.IncotermId = incotermList.FirstOrDefault().IncotermId;
+                booking.IntermediaryId = intermediaryList.FirstOrDefault().IntermediaryId;
+                booking.PaymentConditionId = paymentconditionList.FirstOrDefault().PaymentConditionId;
+                booking.POLId = portList.FirstOrDefault().PortId;
+                booking.OriginalPODId = portList.FirstOrDefault().PortId;
+                booking.LastPODId = portList.FirstOrDefault().PortId;
+                booking.TransportCompanyId = transportcompanyList.FirstOrDefault().TransportCompanyId;
+
+                serviceList = await _transportcompanyserviceService.GetAllAssignedAsync(booking.TransportCompanyId);
+
+                    if(serviceList.Count > 0)
+                    {
+                    booking.ServiceId = serviceList.FirstOrDefault().ServiceId;
+                }
+
+                booking.ShipperId = shipperList.FirstOrDefault().ShipperId;
+                booking.VesselId = vesselList.FirstOrDefault().VesselId;
+                booking.WarehouseId = warehouseList.FirstOrDefault().WarehouseId;
+                booking.ContractTypeId = contracttypeList.FirstOrDefault().ContractTypeId;
+                 */
+
+                listBookingDetails = new List<BookingDetailModel>();
+
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+        isLoading = false;
+    }
+
+    private async Task SearchTT()
+    {
+        int ServiceId, POLId,PODId;
+        DateTime? ETD;
+
+        ServiceId = se.ServiceId;
+        POLId = pol.PortId;
+        PODId = pod.PortId;
+        ETD = booking.LastETD;
+
+        if (ServiceId == 0 || POLId == 0 || ETD == null || PODId == 0)
+        {
+            return;
+        }
+
+        var st = await _bookingService.GetBookingTTAsync(ServiceId, POLId, ETD, PODId);
+
+
+        if (st != null)
+        {
+            booking.TT = st;
+
+            Show("Stacking updated!", Severity.Info);
+        }
+    }
+
+    private async Task SearchStacking()
+    {
+        int TransportCompanyId,ServiceId,VesselId;
+
+        TransportCompanyId = booking.TransportCompanyId;
+        ServiceId = booking.ServiceId;
+
+        if(TransportCompanyId == 0 || ServiceId == 0)
+        {
+            return;
+        }
+
+        var st = await _stackingService.GetAsync(TransportCompanyId, ServiceId);
+
+        /*
+         * 
+        if(st != null)
+        {
+            booking.StackingFrom = st.StackingFrom;
+            booking.StackingUntil = st.StackingUntil;
+            booking.LAR = st.LAR;
+            booking.ExtraLAR = st.ExtraLAR;
+            booking.CutOf = st.CutOf;
+
+            Show("Stacking updated!", Severity.Info);
+        }
+         */
+    }
+
+    private void AddRow(int QtyContainers)
+    {
+        SyncContainerRows();
+    }
+
+    private void AddRow(BookingDetailModel bd)
+    {
+        var n = listBookingDetails.Count + 1;
+        bd.BL = $"BL{n}";
+        bd.Container = $"CNT{n}";
+        bd.Cases = 0;
+
+        listBookingDetails.Add(bd);
+    }
+
+    private void AddRow()
+    {
+        SyncContainerRows();
+    }
+
+    // allowClear: true when called from the user editing "Qty Containers Request" directly (0
+    // should wipe the detail rows). false for the load-time sync of an existing booking, where
+    // qty starting at 0 must not silently delete rows already saved for that booking.
+    private void SyncContainerRows(bool allowClear = true)
+    {
+        var qty = booking.QtyContainers;
+        if (qty <= 0)
+        {
+            if (allowClear)
+            {
+                listBookingDetails.Clear();
+            }
+            StateHasChanged();
+            return;
+        }
+
+        if (allowClear && listBookingDetails.Count > qty)
+        {
+            listBookingDetails.RemoveRange(qty, listBookingDetails.Count - qty);
+        }
+
+        while (listBookingDetails.Count < qty)
+        {
+            var n = listBookingDetails.Count + 1;
+            listBookingDetails.Add(new BookingDetailModel
+            {
+                BL = $"BL{n}",
+                Container = $"CNT{n}",
+                Cases = 0
+            });
+        }
+
+        StateHasChanged();
+    }
+
+    private void CopyDtl(BookingDetailModel bd)
+    {
+        listBookingDetails.Add(bd);
+    }
+
+    private void RemoveDtl(BookingDetailModel bd)
+    {
+        listBookingDetails.Remove(bd);
+    }
+
+    private void RemoveDtl()
+    {
+        listBookingDetails.Clear();
+
+        StateHasChanged();
+    }
+
+    private async Task Submit()
+    {
+
+        if (form is not null)
+        {
+            await form.Validate();
+            if (!form.IsValid)
+            {
+                Show("Faltan datos obligatorios. Revisa los campos marcados en rojo para poder guardar el booking.", Severity.Warning);
+                return;
+            }
+        }
+        _processing = true;
+        var x = new BookingModel();
+
+        #region Valid Null
+        if(tc==null)
+        {
+            tc = new TransportCompanyModel();
+        }
+        booking.TransportCompanyId=tc.TransportCompanyId;
+
+        if(ag==null)
+        {
+            ag = new AgentModel();
+        }
+        booking.AgentId=ag.AgentId;
+
+        if (agEmb == null)
+        {
+            agEmb = new AgentModel();
+        }
+        booking.AgentEmbarqueId = agEmb.AgentId;
+
+        if (agd == null)
+        {
+            agd = new AgentModel();
+        }
+        booking.AgentAduanaId=agd.AgentId;
+
+        if(inter==null)
+        {
+            inter = new IntermediaryModel();
+        }
+        booking.IntermediaryId=inter.IntermediaryId;
+
+        if(ct==null)
+        {
+            ct = new ContractTypeModel();
+        }
+        booking.ContractTypeId = ct.ContractTypeId;
+
+        if (sh == null)
+        {
+            sh = new ShipperModel();
+        }
+        booking.ShipperId=sh.ShipperId;
+
+        if(se==null)
+        {
+            se = new ServiceModel();
+        }
+        booking.ServiceId = se.ServiceId;
+
+        if(ve==null)
+        {
+            ve = new VesselModel();
+        }
+        booking.VesselId = ve.VesselId;
+
+        if(wa==null)
+        {
+            wa = new WarehouseModel();
+        }
+        booking.WarehouseId = wa.WarehouseId;
+
+        if(pol==null)
+        {
+            pol = new PortModel();
+        }
+        booking.POLId = pol.PortId;
+
+        if(pod==null)
+        {
+            pod = new PortModel();
+        }
+        booking.LastPODId = pod.PortId;
+        booking.OriginalPODId=pod.PortId;
+
+        if(cont==null)
+        {
+            cont = new ContainerTypeModel();
+        }
+        booking.ContainerTypeId = cont.ContainerTypeId;
+
+        if(com==null)
+        {
+            com = new CommodityModel();
+        }
+        booking.CommodityId=com.CommodityId;
+
+        if (tra == null)
+        {
+            tra = new TransportModel();
+        }
+        booking.TransportId = tra.TransportId;
+
+        if(bi==null)
+        {
+            bi = new BlIssuedModel();
+        }
+        booking.BlIssuedId = bi.BlIssuedId;
+
+        if (it == null)
+        {
+            it = new IncotermModel();
+        }
+        booking.IncotermId = it.IncotermId;
+
+        if (pc== null)
+        {
+            pc = new PaymentConditionModel();
+        }
+        booking.PaymentConditionId = pc.PaymentConditionId;
+
+        #endregion
+
+        booking.QtyContainersReal = listBookingDetails.Count(bd => bd.StatusContainerId == 1);
+        booking.HsCode ??= "";
+        booking.Temperature ??= "";
+
+        string error;
+        if (booking.BookingId == 0)
+        {
+            booking.SeasonId = seasonId;
+            booking.LastPODId = booking.OriginalPODId;
+
+            (x, error) = await _bookingService.PostResultAsync(booking);
+        }
+        else
+        {
+            (x, error) = await _bookingService.PutResultAsync(booking);
+        }
+
+        if (x == null)
+        {
+            Snackbar.Add(string.IsNullOrWhiteSpace(error) ? "Could not save booking" : error, Severity.Error);
+            _processing = false;
+            return;
+        }
+
+        await _bookingdtlService.DeleteAsync(x.BookingId);
+
+        foreach(var item in listBookingDetails)
+        {
+            item.BookingId = x.BookingId;
+            item.BL ??= "";
+            item.Container ??= "";
+            item.Comment ??= "";
+            item.SendFreeDaysComment ??= "";
+
+            var resp = await _bookingdtlService.PostAsync(item);
+            if (resp == null)
+            {
+                Snackbar.Add("Booking saved, but a container/BL line could not be stored", Severity.Error);
+                _processing = false;
+                return;
+            }
+        }
+
+        _processing=false;
+        MudDialog.Close(true);
+    }
+
+    void Cancel() => MudDialog.Cancel();
+
+    private void FillDownByColumn(BookingDetailModel source, string columnName)
+    {
+        var sourceIndex = listBookingDetails.IndexOf(source);
+        if (sourceIndex < 0) return;
+
+        var property = typeof(BookingDetailModel).GetProperty(columnName);
+        if (property == null) return;
+
+        var sourceValue = property.GetValue(source);
+
+        // Copia el valor a las filas siguientes
+        for (int i = sourceIndex + 1; i < listBookingDetails.Count; i++)
+        {
+            property.SetValue(listBookingDetails[i], sourceValue);
+        }
+
+        StateHasChanged();
+        Show($"✓ {GetColumnDisplayName(columnName)} repeated!", Severity.Success);
+    }
+
+    // Método auxiliar para obtener nombre legible de la columna
+    private string GetColumnDisplayName(string columnName)
+    {
+        return columnName switch
+        {
+            "ConsigneeId" => "Consignee",
+            "NotifyId" => "Notify",
+            "BL" => "BL",
+            "Container" => "Container",
+            "Cases" => "Cases",
+            "StatusContainerId" => "Status",
+            "Comment" => "Comment",
+            _ => columnName
+        };
+    }
+
+    #region Modales
+    private async Task TransportCompanyOpenDialog(TransportCompanyModel s)
+    {
+        var parameters = new DialogParameters<TransportCompanyForm> { { x => x.transportcompany, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<TransportCompanyForm>("Shipping Company", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            transportcompanyList = await _transportcompanyService.GetAllAsync();
+        }
+    }
+    private async Task AgentOpenDialog(AgentModel s)
+    {
+        var parameters = new DialogParameters<AgentForm> { { x => x.agent, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<AgentForm>("Agent", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            agentList = await _agentService.GetAllAsync();
+        }
+    }
+    private async Task AgentEmbOpenDialog(AgentModel s)
+    {
+        var parameters = new DialogParameters<AgentEmbarqueForm> { { x => x.agent, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<AgentEmbarqueForm>("Agent Embarque", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            agentembList = await _agentembarqueService.GetAllAsync();
+        }
+    }
+    private async Task AgentAduanaOpenDialog(AgentModel s)
+    {
+        var parameters = new DialogParameters<AgentAduanaForm> { { x => x.agent, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<AgentAduanaForm>("Agent", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            agentaduanaList = await _agentaduanaService.GetAllAsync();
+        }
+    }
+    private async Task IntermediaryOpenDialog(IntermediaryModel s)
+    {
+        var parameters = new DialogParameters<IntermediaryForm> { { x => x.intermediary, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<IntermediaryForm>("Intermediary", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            agentList = await _agentService.GetAllAsync();
+        }
+    }
+    private async Task ContractTypeOpenDialog(ContractTypeModel s)
+    {
+        var parameters = new DialogParameters<ContractTypeForm> { { x => x.contracttype, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<ContractTypeForm>("ContractType", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            agentList = await _agentService.GetAllAsync();
+        }
+    }
+    private async Task ShipperOpenDialog(ShipperModel s)
+    {
+        var parameters = new DialogParameters<ShipperForm> { { x => x.shipper, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<ShipperForm>("Shipper", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            shipperList = await _shipperService.GetAllAsync();
+        }
+    }
+    private async Task ServiceOpenDialog(ServiceModel s)
+    {
+        var parameters = new DialogParameters<ServiceForm> { { x => x.service, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<ServiceForm>("Service", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            serviceList = await _serviceService.GetAllAsync();
+        }
+    }
+    private async Task TransportOpenDialog(TransportModel s)
+    {
+        var parameters = new DialogParameters<TransportForm> { { x => x.transport, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<TransportForm>("Transport", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            transportList = await _transportService.GetAllAsync();
+        }
+    }
+    private async Task VesselOpenDialog(VesselModel s)                                                                                          
+    {
+        var parameters = new DialogParameters<VesselForm> { { x => x.vessel, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<VesselForm>("Vessel", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            vesselList = await _vesselService.GetAllAsync();
+        }
+    }
+    private async Task WarehouseOpenDialog(WarehouseModel s)
+    {
+        var parameters = new DialogParameters<WarehouseForm> { { x => x.warehouse, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<WarehouseForm>("Depot", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            warehouseList = await _warehouseService.GetAllAsync();
+        }
+    }
+    private async Task PortOpenDialog(PortModel s)
+    {
+        var parameters = new DialogParameters<PortForm> { { x => x.port, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<PortForm>("Port", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            portList = await _portService.GetAllAsync();
+        }
+    }
+    private async Task ContainerTypeOpenDialog(ContainerTypeModel s)
+    {
+        var parameters = new DialogParameters<ContainerTypeForm> { { x => x.containertype, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<ContainerTypeForm>("Container Type", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            portList = await _portService.GetAllAsync();
+        }
+    }
+    private async Task CommodityOpenDialog(CommodityModel s)
+    {
+        var parameters = new DialogParameters<CommodityForm> { { x => x.commodity, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<CommodityForm>("Commodity", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            commodityList = await _commodityService.GetAllAsync();
+        }
+    }
+    private async Task BlIssuedOpenDialog(BlIssuedModel s)
+    {
+        var parameters = new DialogParameters<BlIssuedForm> { { x => x.blissued, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<BlIssuedForm>("BlIssued", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            blissuedList = await _blissuedService.GetAllAsync();
+            if (blissuedList == null)
+            {
+                blissuedList = new List<BlIssuedModel>();
+            }
+
+            if (!string.IsNullOrWhiteSpace(s.BlIssued))
+            {
+                bi = blissuedList.LastOrDefault(x =>
+                    string.Equals(x.BlIssued, s.BlIssued, StringComparison.OrdinalIgnoreCase));
+                if (bi != null)
+                {
+                    booking.BlIssuedId = bi.BlIssuedId;
+                }
+            }
+
+            StateHasChanged();
+        }
+    }
+    private async Task IncotermOpenDialog(IncotermModel s)
+    {
+        var parameters = new DialogParameters<IncotermForm> { { x => x.incoterm, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<IncotermForm>("Incoterm", parameters, options);
+        var result = await dialog.Result;
+
+
+
+        if (!result.Canceled)
+        {
+            incotermList = await _incotermService.GetAllAsync();
+        }
+    }
+    private async Task PaymentConditionOpenDialog(PaymentConditionModel s)
+    {
+        var parameters = new DialogParameters<PaymentConditionForm> { { x => x.paymentcondition, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<PaymentConditionForm>("PaymentCondition", parameters, options);
+        var result = await dialog.Result;
+
+
+
+        if (!result.Canceled)
+        {
+            incotermList = await _incotermService.GetAllAsync();
+        }
+    }
+
+    private async Task ConsigneeOpenDialog(ConsigneeModel s)
+    {
+        var parameters = new DialogParameters<ConsigneeForm> { { x => x.consignee, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<ConsigneeForm>("Consignee", parameters, options);
+        var result = await dialog.Result;
+
+
+
+        if (!result.Canceled)
+        {
+            consigneeList = await _consigneeService.GetAllAsync();
+        }
+    }
+
+    private async Task NotifyOpenDialog(NotifyModel s)
+    {
+        var parameters = new DialogParameters<NotifyForm> { { x => x.notify, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<NotifyForm>("Notify", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            notifyList = await _notifyService.GetAllAsync();
+        }
+    }
+
+    private async Task UpdateETAOpenDialog(int id)
+    {
+        if (id == 0)
+        {
+            return;
+        }
+
+        var bo = await _bookingService.GetAsync(id);
+
+        var b = new BookingETAModel();
+        b.ETA = bo.LastETA;
+        b.BookingId = bo.BookingId;
+
+        var parameters = new DialogParameters<BookingETAForm> { { x => x.booking, b } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<BookingETAForm>("ETA", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            booking.LastETA = result.Data as DateTime?;
+        }
+    }
+
+    private async Task UpdatePODOpenDialog(int id)
+    {
+        if (id == 0)
+        {
+            return;
+        }
+
+        var bo = await _bookingService.GetAsync(id);
+
+        var b = new BookingPODModel();
+        b.PODId = bo.LastPODId;
+        b.BookingId = bo.BookingId;
+
+        var parameters = new DialogParameters<BookingPODForm> { { x => x.booking, b } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<BookingPODForm>("POD", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            booking.LastPODId = Convert.ToInt32(result.Data);
+        }
+    }
+
+    private async Task IncidenceOpenDialog(int id, string container)
+    {
+        if (id > 0 && container.Length > 0)
+        {
+            var s = await _bookingincidenceService.GetAsync(id, container);
+
+            var parameters = new DialogParameters<BookingIncidenceForm> { { x => x.bookingincidenceList, s }, { x => x.BookingId, id }, { x => x.Container, container } };
+            DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Large, FullWidth = true,  BackdropClick = false, CloseButton = true };
+            var dialog = await DialogService.ShowAsync<BookingIncidenceForm>("bookingincidence", parameters, options);
+            var result = await dialog.Result;
+        }
+        else
+        {
+            Show("BookingId and container is requerid!", Severity.Error);
+        }
+    }
+
+    private async Task CommRebFeeOpenDialog(BookingDetailModel bd)
+    {
+        if (id > 0 && bd.Container.Length > 0)
+        {
+            var parameters = new DialogParameters<BookingComRebFeeForm> { { x => x.bd, bd }};
+            DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+            var dialog = await DialogService.ShowAsync<BookingComRebFeeForm>("Booking", parameters, options);
+            var result = await dialog.Result;
+        }
+        else
+        {
+            Show("BookingId and container is requerid!", Severity.Error);
+        }
+    }
+
+    private async Task ContractOpenDialog(int POLId,int PODId,int TransportCompanyId)
+    {
+        var parameters = new DialogParameters<BookingContractForm> { { x => x.POLId, POLId }, { x => x.PODId, PODId }, { x => x.TransportCompanyId, TransportCompanyId } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.ExtraLarge, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<BookingContractForm>("Contract Search", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            var b = result.Data as BookingContractGridModel;
+
+            booking.NroContract = b.NroContract;
+            booking.FeeShipper = b.FeeShipper;
+            booking.FeeIntermediary = b.FeeIntermediary;
+
+            booking.Public = b.Public;
+            booking.Net = b.Net;
+
+            booking.Rebate = b.Public - b.Net;
+            booking.ContractId = b.ContractId;
+
+            //booking.ContractId = b.ContractId;
+            //booking.Contract = b.Contract;
+        }
+    }
+    #endregion
+
+    #region Search Autocomplete
+    private async Task<IEnumerable<ConsigneeModel>> SearchConsignees(string value, CancellationToken token)
+    {
+        // Si no hay valor de búsqueda, retorna todos los consignees
+        if (string.IsNullOrEmpty(value))
+            return consigneeList;
+
+        // Filtra los consignees basado en el texto de búsqueda
+        return consigneeList
+            .Where(x => x.Consignee.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private void ConsigneeChanged(ConsigneeModel? newValue, BookingDetailModel bookingDetail)
+    {
+        if (newValue != null)
+        {
+            bookingDetail.ConsigneeId = newValue.ConsigneeId;
+            // Aquí puedes agregar lógica adicional si necesitas hacer algo cuando cambia el consignee
+            StateHasChanged();
+        }
+    }
+
+    private async Task<IEnumerable<NotifyModel>> SearchNotifies(string value, CancellationToken token)
+    {
+        // Si no hay valor de búsqueda, retorna todos los consignees
+        if (string.IsNullOrEmpty(value))
+            return notifyList;
+
+        // Filtra los consignees basado en el texto de búsqueda
+        return notifyList
+            .Where(x => x.Notify.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private void NotifyChanged(NotifyModel? newValue, BookingDetailModel bookingDetail)
+    {
+        if (newValue != null)
+        {
+            bookingDetail.NotifyId = newValue.NotifyId;
+            // Aquí puedes agregar lógica adicional si necesitas hacer algo cuando cambia el consignee
+            StateHasChanged();
+        }
+    }
+
+    private TransportCompanyModel tc = new();
+    async void TransportCompanyInputChange(int value)
+    {
+        booking.TransportCompanyId = value;
+
+        serviceList = await _transportcompanyserviceService.GetAllAssignedAsync(value);
+        tc = transportcompanyList.Where(e => e.TransportCompanyId == value).FirstOrDefault();
+    }
+
+    // Fired when the user actually picks/clears "Ship. Company" in the form (as opposed to
+    // TransportCompanyInputChange above, which only runs once when an existing booking is
+    // loaded for edit). Without this, Service never reloaded for the chosen carrier, so that
+    // dropdown stayed empty on new bookings and stale after changing the carrier. POL/POD are
+    // intentionally NOT scoped to the carrier: they list every port (see SearchPOL/SearchPOD).
+    private async Task OnTransportCompanySelected(TransportCompanyModel? value)
+    {
+        tc = value;
+        var id = value?.TransportCompanyId ?? 0;
+        booking.TransportCompanyId = id;
+
+        serviceList = await _transportcompanyserviceService.GetAllAssignedAsync(id);
+    }
+    private async Task<IEnumerable<TransportCompanyModel>> SearchTransportCompany(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return transportcompanyList.ToArray();
+        return transportcompanyList.Where(x => x.TransportCompany.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private AgentModel ag = new();
+    async void AgentInputChange(int value)
+    {
+        booking.AgentId = value;
+        ag = agentList.Where(e => e.AgentId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<AgentModel>> SearchAgent(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return agentList.ToArray();
+        return agentList.Where(x => x.Agent.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private AgentModel agEmb = new();
+    async void AgentEmbInputChange(int value)
+    {
+        booking.AgentEmbarqueId = value;
+        agEmb = agentembList.Where(e => e.AgentId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<AgentModel>> SearchEmbAgent(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return agentembList.ToArray();
+        return agentembList.Where(x => x.Agent.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private IntermediaryModel inter = new();
+    async void IntermediaryInputChange(int value)
+    {
+        booking.IntermediaryId = value;
+        inter = intermediaryList.Where(e => e.IntermediaryId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<IntermediaryModel>> SearchIntermediary(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return intermediaryList.ToArray();
+        return intermediaryList.Where(x => x.Intermediary.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private ContractTypeModel ct = new();
+    async void ContractTypeInputChange(int value)
+    {
+        booking.ContractTypeId = value;
+        ct = contracttypeList.Where(e => e.ContractTypeId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<ContractTypeModel>> SearchContractType(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return contracttypeList.ToArray();
+        return contracttypeList.Where(x => x.ContractType.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private ShipperModel sh = new();
+    async void ShipperInputChange(int value)
+    {
+        booking.ShipperId = value;
+        sh = shipperList.Where(e => e.ShipperId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<ShipperModel>> SearchShipper(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return shipperList.ToArray();
+        return shipperList.Where(x => x.Shipper.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private ServiceModel se = new();
+    async void ServiceInputChange(int value)
+    {
+        booking.ServiceId = value;
+        se = serviceList.Where(e => e.ServiceId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<ServiceModel>> SearchService(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return serviceList.ToArray();
+        return serviceList.Where(x => x.Service.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private VesselModel ve = new();
+    async void VesselInputChange(int value)
+    {
+        booking.VesselId = value;
+        ve = vesselList.Where(e => e.VesselId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<VesselModel>> SearchVessel(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return vesselList.ToArray();
+        return vesselList.Where(x => x.Vessel.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private TransportModel tra = new();
+    async void TransportInputChange(int value)
+    {
+        booking.TransportId = value;
+        tra = transportList.Where(e => e.TransportId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<TransportModel>> SearchTransport(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return transportList.ToArray();
+        return transportList.Where(x => x.Transport.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private WarehouseModel wa = new();
+    async void WarehouseInputChange(int value)
+    {
+        booking.WarehouseId = value;
+        wa = warehouseList.Where(e => e.WarehouseId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<WarehouseModel>> SearchWarehouse(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return warehouseList.ToArray();
+        return warehouseList.Where(x => x.Warehouse.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private PortModel pol = new();
+    async void POLInputChange(int value)
+    {
+        booking.POLId = value;
+        pol = portList.Where(e => e.PortId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<PortModel>> SearchPOL(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return portList.ToArray();
+        return portList.Where(x => x.Port.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private PortModel pod = new();
+    async void PODInputChange(int value)
+    {
+        booking.LastPODId = value;
+        pod = portList.Where(e => e.PortId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<PortModel>> SearchPOD(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return portList.ToArray();
+        return portList.Where(x => x.Port.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private CommodityModel com = new();
+    async void CommodityInputChange(int value)
+    {
+        booking.CommodityId = value;
+        com = commodityList.Where(e => e.CommodityId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<CommodityModel>> SearchCommodity(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return commodityList.ToArray();
+        return commodityList.Where(x => x.Commodity.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private ContainerTypeModel cont = new();
+    async void ContainerTypeInputChange(int value)
+    {
+        booking.ContainerTypeId = value;
+        cont = containertypeList.Where(e => e.ContainerTypeId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<ContainerTypeModel>> SearchContainerType(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return containertypeList.ToArray();
+        return containertypeList.Where(x => x.ContainerType.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private BlIssuedModel bi = new();
+    async void BlIssuedInputChange(int value)
+    {
+        booking.BlIssuedId = value;
+        bi = blissuedList.Where(e => e.BlIssuedId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<BlIssuedModel>> SearchBlIssued(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return blissuedList.ToArray();
+        return blissuedList.Where(x => x.BlIssued.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private IncotermModel it = new();
+    async void IncotermInputChange(int value)
+    {
+        booking.IncotermId = value;
+        it = incotermList.Where(e => e.IncotermId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<IncotermModel>> SearchIncoterm(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return incotermList.ToArray();
+        return incotermList.Where(x => x.Incoterm.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private PaymentConditionModel pc = new();
+    async void PaymentConditionInputChange(int value)
+    { 
+
+        booking.PaymentConditionId = value;
+        pc = paymentconditionList.Where(e => e.PaymentConditionId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<PaymentConditionModel>> SearchPaymentCondition(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return paymentconditionList.ToArray();
+        return paymentconditionList.Where(x => x.PaymentCondition.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private AgentModel agd = new();
+    async void AgentAduanaInputChange(int value)
+    {
+
+        booking.AgentAduanaId = value;
+        agd = agentaduanaList.Where(e => e.AgentId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<AgentModel>> SearchAgentAduana(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return agentaduanaList.ToArray();
+        return agentaduanaList.Where(x => x.Agent.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+    #endregion
+
+    string dateFormat = "dd/MM/yyyy";
+    string bound = "not set";
+
+    private void DatePickerTextChanged(string value) 
+    {
+        if (value == null || value.Length < 6)
+        {
+            booking.BookingDate = null;
+        }
+        else
+        {
+            string[] formats = { "ddMMyy", "dd/MM/yyyy", "dd/M/yyyy", "d/MM/yyyy", "d/M/yyyy", "dd/MM/yy", "dd/M/yy", "d/MM/yy", "d/M/yy" };
+            if (DateTime.TryParseExact(value, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime validDate))
+            {
+                booking.BookingDate = validDate;
+            }
+            else
+            {
+                booking.BookingDate = null;
+            }
+        }
+
+        if (booking.BookingDate.HasValue)
+        {
+            bound = booking.BookingDate.Value.ToString(dateFormat);
+        }
+        else
+        {
+            bound = "not set";
+        }
+    }
+
+    private Snackbar _snackbar;
+
+    void Show(string msg, Severity severity)
+    {
+        Snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomCenter;
+        _snackbar = Snackbar.Add(msg, severity);
+    }
+}

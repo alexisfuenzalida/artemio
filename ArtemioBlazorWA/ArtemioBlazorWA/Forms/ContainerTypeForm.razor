@@ -1,0 +1,84 @@
+﻿@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject ISnackbar Snackbar
+@inject ContainerTypeService _containertypeService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            ContainerType
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <FormSkeleton Rows="3" />
+        }
+        else
+        {
+<MudForm @ref="form">
+
+        <MudTextField Variant="Variant.Outlined" T="string" @bind-Value="containertype.ContainerType" Label="ContainerType" Required="true" RequiredError="ContainerType is required!" />
+            </MudForm>
+            }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Disabled="@_processing" OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary">
+            @if (_processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Processing</MudText>
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public ContainerTypeModel containertype { get; set; } = new ContainerTypeModel();
+
+    private bool _processing = false;
+    private MudForm? form;
+    private bool isLoading = false;
+
+    private async Task Submit()
+    {
+
+        if (form is not null)
+        {
+            await form.Validate();
+            if (!form.IsValid)
+            {
+                return;
+            }
+        }
+        var x = new ContainerTypeModel();
+
+        _processing = true;
+
+        if (containertype.ContainerTypeId == 0)
+        {
+            x = await _containertypeService.PostAsync(containertype);
+        }
+        else
+        {
+            x = await _containertypeService.PutAsync(containertype);
+        }
+
+        _processing = false;
+        if (x == null)
+        {
+            Snackbar.Add("Could not save. Please try again.", Severity.Error);
+            return;
+        }
+        MudDialog.Close(true);
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}

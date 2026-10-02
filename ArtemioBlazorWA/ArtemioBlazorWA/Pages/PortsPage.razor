@@ -1,0 +1,135 @@
+﻿@page "/ports"
+
+@using ArtemioBlazorWA.Forms;
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject PortService _portService
+@inject IDialogService DialogService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject ISnackbar Snackbar
+
+<EntityGridPage T="PortModel"
+                 Title="Ports"
+                 Items="@portList"
+                 IsLoading="@isLoading"
+                 @bind-SearchString="_searchString"
+                 QuickFilter="@_quickFilter"
+                 CreateLabel="Create"
+                 OnCreate="@(() => OpenDialog(new PortModel()))"
+                 EmptyMessage="No hay resultados.">
+    <Columns>
+            <PropertyColumn Property="x => x.PortId" Title="Id" />
+            <PropertyColumn Property="x => x.Port" Title="Port" />
+            <TemplateColumn CellClass="d-flex justify-center" Sortable="false" Filterable="false">
+                <CellTemplate>
+                    <MudStack Row>
+                     <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                         <MudMenuItem OnClick="@(() => OpenDialog(context.Item))" Icon="@Icons.Material.Filled.Edit" IconSize="Size.Small">Edit</MudMenuItem>
+                         <MudMenuItem OnClick="@(() => OnDelete(context.Item.PortId))" Icon="@Icons.Material.Filled.Delete" IconSize="Size.Small">Delete</MudMenuItem>
+                     </MudMenu>
+                 </MudStack>
+             </CellTemplate>
+         </TemplateColumn>
+    </Columns>
+</EntityGridPage>
+
+
+@code {
+    List<PortModel> portList = new();
+    private PortModel data = new();
+    private string _searchString;
+    private bool _sortNameByLength;
+    bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await localStorage.SetItemAsync<string>("last", "ports");
+            isLoading = true;
+            portList = await _portService.GetAllAsync();
+
+            if (portList == null)
+            {
+                portList = new List<PortModel>();
+            }
+
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenDialog(PortModel s)
+    {
+        var parameters = new DialogParameters<PortForm> { { x => x.port, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<PortForm>("port", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            portList = await _portService.GetAllAsync();
+        }
+    }
+
+    private async void OnDelete(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete",
+            "Confirm to delete item?",
+            yesText: "Delete", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+
+                    var x = await _portService.DeleteAsync(id);
+                    portList = await _portService.GetAllAsync();
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Snackbar.Add("No se pudo eliminar el registro. Intenta nuevamente.", Severity.Error);
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private Func<PortModel, object> _sortBy => x =>
+    {
+        if (_sortNameByLength)
+            return x.Port.Length;
+        else
+            return x.Port;
+    };
+
+    private Func<PortModel, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.Port.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+}

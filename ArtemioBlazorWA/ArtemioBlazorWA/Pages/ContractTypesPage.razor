@@ -1,0 +1,135 @@
+﻿@page "/contracttypes"
+
+@using ArtemioBlazorWA.Forms;
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject ContractTypeService _contracttypeService
+@inject IDialogService DialogService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject ISnackbar Snackbar
+
+<EntityGridPage T="ContractTypeModel"
+                 Title="Contract Types"
+                 Items="@contracttypeList"
+                 IsLoading="@isLoading"
+                 @bind-SearchString="_searchString"
+                 QuickFilter="@_quickFilter"
+                 CreateLabel="Create"
+                 OnCreate="@(() => OpenDialog(new ContractTypeModel()))"
+                 EmptyMessage="No hay resultados.">
+    <Columns>
+             <PropertyColumn Property="x => x.ContractTypeId" Title="Id" />
+             <PropertyColumn Property="x => x.ContractType" Title="ContractType" />
+             <TemplateColumn CellClass="d-flex justify-center" Sortable="false" Filterable="false">
+                 <CellTemplate>
+                     <MudStack Row>
+                     <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                         <MudMenuItem OnClick="@(() => OpenDialog(context.Item))" Icon="@Icons.Material.Filled.Edit" IconSize="Size.Small">Edit</MudMenuItem>
+                         <MudMenuItem OnClick="@(() => OnDelete(context.Item.ContractTypeId))" Icon="@Icons.Material.Filled.Delete" IconSize="Size.Small">Delete</MudMenuItem>
+                     </MudMenu>
+                 </MudStack>
+             </CellTemplate>
+         </TemplateColumn>
+    </Columns>
+</EntityGridPage>
+
+
+@code {
+    List<ContractTypeModel> contracttypeList = new();
+    private ContractTypeModel data = new();
+    private string _searchString;
+    private bool _sortNameByLength;
+    bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await localStorage.SetItemAsync<string>("last", "contracttypes");
+            isLoading = true;
+            contracttypeList = await _contracttypeService.GetAllAsync();
+
+            if (contracttypeList == null)
+            {
+                contracttypeList = new List<ContractTypeModel>();
+            }
+
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenDialog(ContractTypeModel s)
+    {
+        var parameters = new DialogParameters<ContractTypeForm> { { x => x.contracttype, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<ContractTypeForm>("Contract Type", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            contracttypeList = await _contracttypeService.GetAllAsync();
+        }
+    }
+
+    private async void OnDelete(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete",
+            "Confirm to delete item?",
+            yesText: "Delete", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+
+                    var x = await _contracttypeService.DeleteAsync(id);
+                    contracttypeList = await _contracttypeService.GetAllAsync();
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Snackbar.Add("No se pudo eliminar el registro. Intenta nuevamente.", Severity.Error);
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private Func<ContractTypeModel, object> _sortBy => x =>
+    {
+        if (_sortNameByLength)
+            return x.ContractType.Length;
+        else
+            return x.ContractType;
+    };
+
+    private Func<ContractTypeModel, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.ContractType.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+}

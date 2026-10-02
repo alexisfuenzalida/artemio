@@ -1,0 +1,65 @@
+@using ArtemioBlazorWA.Shared
+
+<MudPaper Width="250px" Elevation="0">
+    <MudStack Class="pa-2" Spacing="0">
+        <MudTextField T="string"
+                      Value="_filter"
+                      ValueChanged="OnFilterChanged"
+                      Placeholder="Search menu..."
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Small"
+                      Immediate="true"
+                      Clearable="true"
+                      Variant="Variant.Text" />
+    </MudStack>
+    <MudNavMenu Color="Color.Primary" Bordered="true">
+        <MudDivider Class="my-2" />
+        <MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard" Match="NavLinkMatch.All">DASHBOARD</MudNavLink>
+
+        @foreach (var group in FilteredGroups())
+        {
+            <MudNavGroup Title="@group.Title.ToUpperInvariant()" Icon="@group.Icon" Expanded="true">
+                @foreach (var item in FilteredItems(group))
+                {
+                    <MudNavLink Href="@item.Href" Icon="@item.Icon" Match="@item.Match">@item.Label</MudNavLink>
+                }
+            </MudNavGroup>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_filter) && !FilteredGroups().Any())
+        {
+            <MudText Typo="Typo.body2" Class="pa-4" Color="Color.Secondary">
+                No results for "@_filter"
+            </MudText>
+        }
+
+        <MudDivider Class="my-5" />
+    </MudNavMenu>
+</MudPaper>
+
+@code {
+    private string _filter = "";
+
+    private void OnFilterChanged(string value) => _filter = value ?? "";
+
+    private IEnumerable<NavGroup> FilteredGroups()
+    {
+        if (string.IsNullOrWhiteSpace(_filter))
+        {
+            return NavStructure.Groups;
+        }
+
+        return NavStructure.Groups.Where(g => g.Items.Any(i => i.Label.Contains(_filter, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private IEnumerable<NavItem> FilteredItems(NavGroup group)
+    {
+        if (string.IsNullOrWhiteSpace(_filter))
+        {
+            return group.Items;
+        }
+
+        return group.Items.Where(i => i.Label.Contains(_filter, StringComparison.OrdinalIgnoreCase));
+    }
+}

@@ -1,0 +1,135 @@
+﻿@page "/consignees"
+
+@using ArtemioBlazorWA.Forms;
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject ConsigneeService _agentService
+@inject IDialogService DialogService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject ISnackbar Snackbar
+
+<EntityGridPage T="ConsigneeModel"
+                 Title="Consignees"
+                 Items="@agentList"
+                 IsLoading="@isLoading"
+                 @bind-SearchString="_searchString"
+                 QuickFilter="@_quickFilter"
+                 CreateLabel="Create"
+                 OnCreate="@(() => OpenDialog(new ConsigneeModel()))"
+                 EmptyMessage="No hay resultados.">
+    <Columns>
+             <PropertyColumn Property="x => x.ConsigneeId" Title="Id" />
+             <PropertyColumn Property="x => x.Consignee" Title="Consignee" />
+             <TemplateColumn CellClass="d-flex justify-center" Sortable="false" Filterable="false">
+                 <CellTemplate>
+                     <MudStack Row>
+                     <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                         <MudMenuItem OnClick="@(() => OpenDialog(context.Item))" Icon="@Icons.Material.Filled.Edit" IconSize="Size.Small">Edit</MudMenuItem>
+                         <MudMenuItem OnClick="@(() => OnDelete(context.Item.ConsigneeId))" Icon="@Icons.Material.Filled.Delete" IconSize="Size.Small">Delete</MudMenuItem>
+                     </MudMenu>
+                 </MudStack>
+             </CellTemplate>
+         </TemplateColumn>
+    </Columns>
+</EntityGridPage>
+
+
+@code {
+    List<ConsigneeModel> agentList = new();
+    private ConsigneeModel data = new();
+    private string _searchString;
+    private bool _sortNameByLength;
+    bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await localStorage.SetItemAsync<string>("last", "consignees");
+            isLoading = true;
+            agentList = await _agentService.GetAllAsync();
+
+            if (agentList == null)
+            {
+                agentList = new List<ConsigneeModel>();
+            }
+
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenDialog(ConsigneeModel s)
+    {
+        var parameters = new DialogParameters<ConsigneeForm> { { x => x.consignee, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<ConsigneeForm>("agent", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            agentList = await _agentService.GetAllAsync();
+        }
+    }
+
+    private async void OnDelete(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete",
+            "Confirm to delete item?",
+            yesText: "Delete", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+
+                    var x = await _agentService.DeleteAsync(id);
+                    agentList = await _agentService.GetAllAsync();
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Snackbar.Add("No se pudo eliminar el registro. Intenta nuevamente.", Severity.Error);
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private Func<ConsigneeModel, object> _sortBy => x =>
+    {
+        if (_sortNameByLength)
+            return x.Consignee.Length;
+        else
+            return x.Consignee;
+    };
+
+    private Func<ConsigneeModel, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.Consignee.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+}

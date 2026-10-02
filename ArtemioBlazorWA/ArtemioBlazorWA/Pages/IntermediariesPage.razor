@@ -1,0 +1,135 @@
+﻿@page "/intermediaries"
+
+@using ArtemioBlazorWA.Forms;
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject IntermediaryService _intermediaryService
+@inject IDialogService DialogService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject ISnackbar Snackbar
+
+<EntityGridPage T="IntermediaryModel"
+                 Title="Intermediaries"
+                 Items="@intermediaryList"
+                 IsLoading="@isLoading"
+                 @bind-SearchString="_searchString"
+                 QuickFilter="@_quickFilter"
+                 CreateLabel="Create"
+                 OnCreate="@(() => OpenDialog(new IntermediaryModel()))"
+                 EmptyMessage="No hay resultados.">
+    <Columns>
+            <PropertyColumn Property="x => x.IntermediaryId" Title="Id" />
+            <PropertyColumn Property="x => x.Intermediary" Title="Intermediary" />
+            <TemplateColumn CellClass="d-flex justify-center" Sortable="false" Filterable="false">
+                <CellTemplate>
+                    <MudStack Row>
+                     <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                         <MudMenuItem OnClick="@(() => OpenDialog(context.Item))" Icon="@Icons.Material.Filled.Edit" IconSize="Size.Small">Edit</MudMenuItem>
+                         <MudMenuItem OnClick="@(() => OnDelete(context.Item.IntermediaryId))" Icon="@Icons.Material.Filled.Delete" IconSize="Size.Small">Delete</MudMenuItem>
+                     </MudMenu>
+                 </MudStack>
+             </CellTemplate>
+         </TemplateColumn>
+    </Columns>
+</EntityGridPage>
+
+
+@code {
+    List<IntermediaryModel> intermediaryList = new();
+    private IntermediaryModel data = new();
+    private string _searchString;
+    private bool _sortNameByLength;
+    bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await localStorage.SetItemAsync<string>("last", "intermediaries");
+            isLoading = true;
+            intermediaryList = await _intermediaryService.GetAllAsync();
+
+            if (intermediaryList == null)
+            {
+                intermediaryList = new List<IntermediaryModel>();
+            }
+
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenDialog(IntermediaryModel s)
+    {
+        var parameters = new DialogParameters<IntermediaryForm> { { x => x.intermediary, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<IntermediaryForm>("intermediary", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            intermediaryList = await _intermediaryService.GetAllAsync();
+        }
+    }
+
+    private async void OnDelete(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete",
+            "Confirm to delete item?",
+            yesText: "Delete", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+
+                    var x = await _intermediaryService.DeleteAsync(id);
+                    intermediaryList = await _intermediaryService.GetAllAsync();
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Snackbar.Add("No se pudo eliminar el registro. Intenta nuevamente.", Severity.Error);
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private Func<IntermediaryModel, object> _sortBy => x =>
+    {
+        if (_sortNameByLength)
+            return x.Intermediary.Length;
+        else
+            return x.Intermediary;
+    };
+
+    private Func<IntermediaryModel, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.Intermediary.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+}

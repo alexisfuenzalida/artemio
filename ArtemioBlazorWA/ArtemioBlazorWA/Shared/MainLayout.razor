@@ -1,0 +1,151 @@
+﻿@inherits LayoutComponentBase
+@attribute [Authorize]
+@implements IDisposable
+
+@using ArtemioBlazorWA.Auth
+@using ArtemioBlazorWA.Models
+@using ArtemioBlazorWA.Services
+@using ArtemioBlazorWA.Shared
+@using ArtemioBlazorWA.Theme
+
+@inject SeasonSerice _seasonService
+@inject NavigationManager navigationManager
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject JwtAuthStateProvider AuthState
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ThemeService ThemeService
+
+<MudThemeProvider Theme="AppTheme.Default" IsDarkMode="ThemeService.IsDarkMode" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudPopoverProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" aria-label="Toggle navigation menu" />
+        <MudText Typo="Typo.subtitle1" Class="ml-2">@pageTitle</MudText>
+        <MudSpacer />
+        <MudText Typo="Typo.body2" Class="mr-4">@seasonStr</MudText>
+        <MudIconButton Icon="@(ThemeService.IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                        Color="Color.Inherit"
+                        OnClick="@(() => ThemeService.ToggleAsync())"
+                        aria-label="Toggle dark mode" />
+        <MudMenu>
+            <ActivatorContent>
+                <MudIconButton Icon="@Icons.Material.Outlined.Person" Color="Color.Inherit" aria-label="User menu" />
+            </ActivatorContent>
+            <ChildContent>
+                <MudMenuItem>@seasonStr</MudMenuItem>
+                <MudDivider />
+                <MudMenuItem OnClick="Logout">Logout</MudMenuItem>
+            </ChildContent>
+        </MudMenu>
+    </MudAppBar>
+    <MudDrawer @bind-Open="@_drawerOpen">
+        <MudDrawerHeader>
+            <MudStack Spacing="5">
+                <MudImage Src="./images/artemio.png" Width="180" />
+            </MudStack>
+        </MudDrawerHeader>
+        @if(@userStr == "operaciones")
+        {
+            <NavMenuTransport />
+        }
+        else
+        {
+            <NavMenu />
+        }
+    </MudDrawer>
+    <MudMainContent>
+        <MudPaper Style="background-color: transparent;" Elevation="0">
+            <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Style="background-color: transparent;" Class="mt-3">
+                @Body
+            </MudContainer>
+        </MudPaper>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    string seasonStr = "";
+    string userStr = "";
+    string pageTitle = "";
+
+    bool _drawerOpen = true;
+
+    void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    async Task Logout()
+    {
+        await localStorage.RemoveItemAsync("user");
+        await localStorage.RemoveItemAsync("season");
+        await localStorage.RemoveItemAsync("rememberme");
+        await localStorage.RemoveItemAsync("last");
+        await AuthState.MarkUserAsLoggedOut();
+        navigationManager.NavigateTo("/", replace: true);
+    }
+
+    async Task Valida()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated != true)
+        {
+            return;
+        }
+
+        userStr = state.User.FindFirst("type")?.Value
+            ?? state.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
+            ?? "";
+
+        var season = await localStorage.GetItemAsync<int>("season");
+        var seasonList = await _seasonService.GetAllAsync() ?? new List<SeasonModel>();
+        seasonStr = seasonList.FirstOrDefault(e => e.SeasonId == season)?.Season ?? "";
+
+        var currentPath = navigationManager.ToBaseRelativePath(navigationManager.Uri);
+        if (string.Equals(userStr, "operaciones", StringComparison.OrdinalIgnoreCase)
+            && !currentPath.StartsWith("tta", StringComparison.OrdinalIgnoreCase))
+        {
+            navigationManager.NavigateTo("/tta", replace: true);
+        }
+
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            navigationManager.LocationChanged += OnLocationChanged;
+            ThemeService.OnChange += OnThemeChanged;
+            UpdatePageTitle();
+            StateHasChanged();
+            await Valida();
+            await ThemeService.InitializeAsync();
+        }
+    }
+
+    void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        UpdatePageTitle();
+        StateHasChanged();
+    }
+
+    void OnThemeChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    void UpdatePageTitle()
+    {
+        var currentPath = navigationManager.ToBaseRelativePath(navigationManager.Uri);
+        pageTitle = NavStructure.GetTitle(currentPath) ?? "";
+    }
+
+    public void Dispose()
+    {
+        navigationManager.LocationChanged -= OnLocationChanged;
+        ThemeService.OnChange -= OnThemeChanged;
+    }
+}

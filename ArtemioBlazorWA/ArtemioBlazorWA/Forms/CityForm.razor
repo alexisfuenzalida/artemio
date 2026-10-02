@@ -1,0 +1,160 @@
+﻿@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+@using ArtemioBlazorWA.Forms;
+
+@inject CityService _cityService
+@inject CountryService _countryService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            City
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <FormSkeleton Rows="3" />
+        }
+        else
+        {
+<MudForm @ref="form">
+
+        <MudGrid>
+            <MudItem xs="12">
+                <MudTextField Variant="Variant.Outlined" T="string" @bind-Value="city.City" Label="City" Required="true" RequiredError="City is required!" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                    <MudItem xs="9">
+                        <MudSelect Variant="Variant.Outlined" T="int" Label="Country" @bind-Value="city.CountryId" Required="true" RequiredError="Country is required!"
+                                   ToStringFunc="@(id => countryList.FirstOrDefault(c => c.CountryId == id)?.Country)">
+                            @foreach (CountryModel item in countryList)
+                            {
+                                <MudSelectItem T="int" Value="@item.CountryId">@item.Country</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="3">
+                        <MudFab StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => OpenDialog(new CountryModel()))" />
+                    </MudItem>
+                </MudGrid>
+            </MudItem>
+        </MudGrid>
+            </MudForm>
+            }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Disabled="@_processing" OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary">
+            @if (_processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Processing</MudText>
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public CityModel city { get; set; } = new CityModel();
+
+    private List<CountryModel> countryList = new();
+
+    private bool _processing = false;
+    private MudForm? form;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            countryList = await _countryService.GetAllAsync();
+
+            if (countryList == null)
+            {
+                countryList = new List<CountryModel>();
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+        isLoading = false;
+    }
+
+
+    private async Task Submit()
+    {
+
+        if (form is not null)
+        {
+            await form.Validate();
+            if (!form.IsValid)
+            {
+                return;
+            }
+        }
+        if (city.CountryId == 0)
+        {
+            Show("Country is required!",Severity.Error);
+
+            return;
+        }
+
+        var x = new CityModel();
+
+        _processing = true;
+
+        if (city.CityId == 0)
+        {
+            x = await _cityService.PostAsync(city);
+        }
+        else
+        {
+            x = await _cityService.PutAsync(city);
+        }
+
+        _processing = false;
+        if (x == null)
+        {
+            Snackbar.Add("Could not save. Please try again.", Severity.Error);
+            return;
+        }
+        MudDialog.Close(true);
+    }
+
+    void Cancel() => MudDialog.Cancel();
+
+    private async Task OpenDialog(CountryModel s)
+    {
+        var parameters = new DialogParameters<CountryForm> { { x => x.country, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<CountryForm>("country", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            countryList = await _countryService.GetAllAsync();
+        }
+    }
+
+    private Snackbar? _snackbar;
+
+    void Show(string msg, Severity severity)
+    {
+        _snackbar = Snackbar.Add(msg, severity);
+    }
+}

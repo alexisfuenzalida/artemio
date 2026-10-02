@@ -1,0 +1,167 @@
+﻿@layout SecondLayout
+@attribute [AllowAnonymous]
+
+@page "/"
+@using ArtemioBlazorWA.Auth
+@using ArtemioBlazorWA.Models
+@using ArtemioBlazorWA.Services
+
+@inject UserService _userService
+@inject SeasonSerice _seasonService
+@inject NavigationManager navigationManager
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject JwtAuthStateProvider AuthState
+
+@inject ISnackbar Snackbar
+
+<MudPaper Class="d-flex justify-content-center align-items-center flex-grow-1 gap-4 pa-6 my-6" Elevation="1">
+    <MudGrid>
+        <MudItem xs="12">
+            <MudText Typo="Typo.h5" Align="Align.Center" GutterBottom="true">Login</MudText>
+        </MudItem>
+        <MudItem xs="12">
+            <MudTextField Variant="Variant.Outlined" T="string" @bind-Value="login.User" Label="Usuario" Required="true" RequiredError="Este dato es requerido" Adornment="Adornment.End"
+                          AdornmentIcon="@Icons.Material.Filled.Person" />
+        </MudItem>
+        <MudItem xs="12">
+            <MudTextField Variant="Variant.Outlined"
+                          T="string"
+            @bind-Value="login.Password"
+                          Label="Contraseña"
+                          Required="true"
+                          RequiredError="Este dato es requerido"
+                          InputType="@PasswordInput"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@PasswordInputIcon"
+                          OnAdornmentClick="ButtonTestclick"
+                          AdornmentAriaLabel="Show Password" />
+        </MudItem>
+        <MudItem xs="12">
+            @if (isLoading)
+            {
+                <FormSkeleton Rows="1" />
+            }
+            else
+            {
+                <MudSelect Variant="Variant.Outlined" T="int" Label="Season" @bind-Value="login.SeasonId" Required="true" RequiredError="Season is required!"
+                           ToStringFunc="@(id => lstSeason.FirstOrDefault(s => s.SeasonId == id)?.Season)">
+                    @foreach (var item in lstSeason)
+                    {
+                        <MudSelectItem T="int" Value="@item.SeasonId">@item.Season</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudCheckBox @bind-Value="@rememberme" Color="Color.Primary" T="bool">Remember me</MudCheckBox>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudButton Disabled="@_processing" OnClick="Login" Variant="Variant.Filled" Color="Color.Primary" FullWidth="true">
+                @if (_processing)
+                {
+                    <MudProgressCircular Color="Color.Primary" Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                    <MudText Class="ms-2">Loading</MudText>
+                }
+                else
+                {
+                    <MudText>Login</MudText>
+                }
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@code {
+    private LoginModel login = new LoginModel();
+
+    private List<SeasonModel> lstSeason = new List<SeasonModel>();
+
+    private bool isLoading = true;
+    private bool _processing = false;
+    private bool rememberme = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            isLoading = true;
+            lstSeason = await _seasonService.GetAllAsync() ?? new List<SeasonModel>();
+            if (lstSeason.Count > 0)
+            {
+                login.SeasonId = lstSeason.Max(e => e.SeasonId);
+            }
+            else
+            {
+                Show("No se pudieron cargar las seasons. Revisa que la API esté disponible.");
+            }
+        }
+        catch (Exception)
+        {
+            Show("No se pudo conectar con /api/seasons");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    async Task Login()
+    {
+        _processing = true;
+
+        var em = await _userService.PostLoginAsync(login);
+
+        if (em != null && !string.IsNullOrWhiteSpace(em.Token))
+        {
+            await localStorage.SetItemAsync<string>("user", em.User);
+            await localStorage.SetItemAsync<int>("season", login.SeasonId);
+            await localStorage.SetItemAsync<string>("last", "booking");
+            await AuthState.MarkUserAsAuthenticated(em.Token, rememberme);
+
+            var dest = string.Equals(em.Type, "operaciones", StringComparison.OrdinalIgnoreCase) ? "/tta" : "/booking";
+            navigationManager.NavigateTo(dest, replace: true);
+        }
+        else
+        {
+            Show("User or password incorrect");
+        }
+
+        _processing = false;
+    }
+
+    bool isShow;
+    InputType PasswordInput = InputType.Password;
+    string PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+
+    void ButtonTestclick()
+    {
+        @if (isShow)
+        {
+            isShow = false;
+            PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+            PasswordInput = InputType.Password;
+        }
+        else
+        {
+            isShow = true;
+            PasswordInputIcon = Icons.Material.Filled.Visibility;
+            PasswordInput = InputType.Text;
+        }
+    }
+
+    private Snackbar _snackbar;
+
+    void Show(string msg)
+    {
+        Snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomCenter;
+        _snackbar = Snackbar.Add(msg, Severity.Error);
+    }
+}

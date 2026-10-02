@@ -1,0 +1,135 @@
+﻿@page "/blissueds"
+
+@using ArtemioBlazorWA.Forms;
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject BlIssuedService _blissuedService
+@inject IDialogService DialogService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject ISnackbar Snackbar
+
+<EntityGridPage T="BlIssuedModel"
+                 Title="Bl Issued"
+                 Items="@blissuedList"
+                 IsLoading="@isLoading"
+                 @bind-SearchString="_searchString"
+                 QuickFilter="@_quickFilter"
+                 CreateLabel="Create"
+                 OnCreate="@(() => OpenDialog(new BlIssuedModel()))"
+                 EmptyMessage="No hay resultados.">
+    <Columns>
+            <PropertyColumn Property="x => x.BlIssuedId" Title="Id" />
+            <PropertyColumn Property="x => x.BlIssued" Title="BlIssued" />
+            <TemplateColumn CellClass="d-flex justify-center" Sortable="false" Filterable="false">
+                <CellTemplate>
+                    <MudStack Row>
+                     <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                         <MudMenuItem OnClick="@(() => OpenDialog(context.Item))" Icon="@Icons.Material.Filled.Edit" IconSize="Size.Small">Edit</MudMenuItem>
+                         <MudMenuItem OnClick="@(() => OnDelete(context.Item.BlIssuedId))" Icon="@Icons.Material.Filled.Delete" IconSize="Size.Small">Delete</MudMenuItem>
+                     </MudMenu>
+                 </MudStack>
+             </CellTemplate>
+         </TemplateColumn>
+    </Columns>
+</EntityGridPage>
+
+
+@code {
+    List<BlIssuedModel> blissuedList = new();
+    private BlIssuedModel data = new();
+    private string _searchString="";
+    private bool _sortNameByLength;
+    bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await localStorage.SetItemAsync<string>("last", "blissueds");
+            isLoading = true;
+            blissuedList = await _blissuedService.GetAllAsync();
+
+            if (blissuedList == null)
+            {
+                blissuedList = new List<BlIssuedModel>();
+            }
+
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenDialog(BlIssuedModel s)
+    {
+        var parameters = new DialogParameters<BlIssuedForm> { { x => x.blissued, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<BlIssuedForm>("blissued", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            blissuedList = await _blissuedService.GetAllAsync();
+        }
+    }
+
+    private async void OnDelete(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete",
+            "Confirm to delete item?",
+            yesText: "Delete", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+
+                    var x = await _blissuedService.DeleteAsync(id);
+                    blissuedList = await _blissuedService.GetAllAsync();
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Snackbar.Add("No se pudo eliminar el registro. Intenta nuevamente.", Severity.Error);
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private Func<BlIssuedModel, object> _sortBy => x =>
+    {
+        if (_sortNameByLength)
+            return x.BlIssued.Length;
+        else
+            return x.BlIssued;
+    };
+
+    private Func<BlIssuedModel, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.BlIssued.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+}

@@ -1,0 +1,28 @@
+@attribute [AllowAnonymous]
+@inject AuthTokenStore TokenStore
+@inject JwtAuthStateProvider AuthState
+@inject NavigationManager Navigation
+@implements IDisposable
+
+@code {
+    protected override void OnInitialized()
+    {
+        TokenStore.Unauthorized += OnUnauthorizedAsync;
+    }
+
+    private async Task OnUnauthorizedAsync()
+    {
+        await AuthState.MarkUserAsLoggedOut();
+
+        var path = Navigation.ToBaseRelativePath(Navigation.Uri);
+        if (!string.IsNullOrEmpty(path) && path != "/")
+        {
+            Navigation.NavigateTo("/", replace: true);
+        }
+    }
+
+    public void Dispose()
+    {
+        TokenStore.Unauthorized -= OnUnauthorizedAsync;
+    }
+}

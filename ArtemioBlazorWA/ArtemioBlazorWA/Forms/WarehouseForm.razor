@@ -1,0 +1,147 @@
+﻿@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+@using ArtemioBlazorWA.Forms;
+
+@inject WarehouseService _warehouseService
+@inject CityService _cityService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            Depot
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <FormSkeleton Rows="3" />
+        }
+        else
+        {
+<MudForm @ref="form">
+
+        <MudGrid>
+            <MudItem xs="12">
+                <MudTextField Variant="Variant.Outlined" T="string" @bind-Value="warehouse.Warehouse" Label="Depot" Required="true" RequiredError="Depot is required!" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                    <MudItem xs="9">
+                        <MudSelect Variant="Variant.Outlined" T="int" Label="City" @bind-Value="warehouse.CityId" Required="true" RequiredError="City is required!"
+                                   ToStringFunc="@(id => cityList.FirstOrDefault(c => c.CityId == id)?.City)">
+                            @foreach (CityModel item in cityList)
+                            {
+                                <MudSelectItem T="int" Value="@item.CityId">@item.City</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="3">
+                        <MudFab StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => OpenDialog(city))" />
+                    </MudItem>
+                </MudGrid>
+            </MudItem>
+        </MudGrid>
+            </MudForm>
+            }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Disabled="@_processing" OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary">
+            @if (_processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Processing</MudText>
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public WarehouseModel warehouse { get; set; } = new WarehouseModel();
+
+    private CityModel city = new();
+    private List<CityModel> cityList = new();
+
+    private bool _processing = false;
+    private MudForm? form;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            cityList = await _cityService.GetAllAsync();
+
+            if (cityList == null)
+            {
+                cityList = new List<CityModel>();
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+        isLoading = false;
+    }
+
+
+    private async Task Submit()
+    {
+
+        if (form is not null)
+        {
+            await form.Validate();
+            if (!form.IsValid)
+            {
+                return;
+            }
+        }
+        var x = new WarehouseModel();
+
+        _processing = true;
+
+        if (warehouse.WarehouseId == 0)
+        {
+            x = await _warehouseService.PostAsync(warehouse);
+        }
+        else
+        {
+            x = await _warehouseService.PutAsync(warehouse);
+        }
+
+        _processing = false;
+        if (x == null)
+        {
+            Snackbar.Add("Could not save. Please try again.", Severity.Error);
+            return;
+        }
+        MudDialog.Close(true);
+    }
+
+    void Cancel() => MudDialog.Cancel();
+
+    private async Task OpenDialog(CityModel s)
+    {
+        var parameters = new DialogParameters<CityForm> { { x => x.city, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<CityForm>("city", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            cityList = await _cityService.GetAllAsync();
+        }
+    }
+}

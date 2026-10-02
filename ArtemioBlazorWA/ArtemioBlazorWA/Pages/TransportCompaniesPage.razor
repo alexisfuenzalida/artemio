@@ -1,0 +1,141 @@
+﻿@page "/transportcompanies"
+
+@using ArtemioBlazorWA.Forms;
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject TransportCompanyService _transportcompanyService
+@inject IDialogService DialogService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject ISnackbar Snackbar
+
+<EntityGridPage T="TransportCompanyModel"
+                 Title="Shipping Companies"
+                 Items="@transportcompanyList"
+                 IsLoading="@isLoading"
+                 @bind-SearchString="_searchString"
+                 QuickFilter="@_quickFilter"
+                 CreateLabel="Create"
+                 OnCreate="@(() => OpenDialog(new TransportCompanyModel()))"
+                 EmptyMessage="No hay resultados.">
+    <Columns>
+            <PropertyColumn Property="x => x.TransportCompanyId" Title="Id" />
+            <PropertyColumn Property="x => x.TransportCompany" Title="ShippingCompany" />
+            <TemplateColumn CellClass="d-flex justify-center" Sortable="false" Filterable="false">
+                <CellTemplate>
+                    <MudStack Row>
+                     <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                         <MudMenuItem OnClick="@(() => OpenDialog(context.Item))" Icon="@Icons.Material.Filled.Edit" IconSize="Size.Small">Edit</MudMenuItem>
+                         <MudMenuItem OnClick="@(() => OnDelete(context.Item.TransportCompanyId))" Icon="@Icons.Material.Filled.Delete" IconSize="Size.Small">Delete</MudMenuItem>
+                     </MudMenu>
+                 </MudStack>
+             </CellTemplate>
+         </TemplateColumn>
+    </Columns>
+</EntityGridPage>
+
+
+@code {
+    List<TransportCompanyModel> transportcompanyList = new();
+    private TransportCompanyModel data = new()
+        {
+            TransportCompanyId = 0,
+            TransportCompany = ""
+        };
+
+    private string _searchString;
+    private bool _sortNameByLength;
+    bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await localStorage.SetItemAsync<string>("last", "transportcompanies");
+
+            isLoading = true;
+            transportcompanyList = await _transportcompanyService.GetAllAsync();
+
+            if (transportcompanyList == null)
+            {
+                transportcompanyList = new List<TransportCompanyModel>();
+            }
+
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenDialog(TransportCompanyModel s)
+    {
+        var parameters = new DialogParameters<TransportCompanyForm> { { x => x.transportcompany, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<TransportCompanyForm>("transportcompany", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            transportcompanyList = await _transportcompanyService.GetAllAsync();
+        }
+    }
+
+    private async void OnDelete(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete",
+            "Confirm to delete item?",
+            yesText: "Delete", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+
+                    var x = await _transportcompanyService.DeleteAsync(id);
+                    transportcompanyList = await _transportcompanyService.GetAllAsync();
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Snackbar.Add("No se pudo eliminar el registro. Intenta nuevamente.", Severity.Error);
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private Func<TransportCompanyModel, object> _sortBy => x =>
+    {
+        if (_sortNameByLength)
+            return x.TransportCompany.Length;
+        else
+            return x.TransportCompany;
+    };
+
+    private Func<TransportCompanyModel, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.TransportCompany.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+}

@@ -1,0 +1,956 @@
+﻿@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+@using System.Globalization
+
+@inject ContractService _contractService
+@inject ContractDtlService _contractdtlService
+@inject ContractConditionService _contractconditionService
+@inject CommodityService _commodityService
+@inject PortService _portService
+@inject ServiceService _serviceService
+@inject TransportCompanyService _transportcompanyService
+@inject TransportCompanyServiceService _transportcompanyserviceService
+@inject TransportCompanyPolService _transportcompanypolService
+@inject TransportCompanyPodService _transportcompanypodService
+@inject CostItemService _costitemService
+@inject CountryService _countryService
+@inject PaymentConditionService _pcService
+@inject InvolvedService _involvedService
+@inject IntermediaryService _intermediaryService
+@inject ShipperService _shipperService
+
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            Contract
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <FormSkeleton Rows="8" Columns="4" />
+        }
+        else
+        {
+<MudForm @ref="form">
+
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                    <MudItem xs="9">
+                        <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="TransportCompanyModel"
+                                         Label="Ship. Company"
+                                         SearchFunc="@SearchTransportCompany"
+                                         Value="tc"
+                                         ValueChanged="TransportCompanyInputChange"
+                                                  Clearable
+                                          ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                          ToStringFunc="@(tc => tc is null ? null : $"{tc.TransportCompany}")"
+                                          CoerceText="false"
+                                          CoerceValue="false" />
+                     </MudItem>
+                     <MudItem xs="3">
+                         <MudFab Margin="Margin.Dense" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => TransportCompanyOpenDialog(new TransportCompanyModel()))" />
+                     </MudItem>
+                 </MudGrid>
+             </MudItem>
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                 <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Nro Contract" @bind-Value="contract.NroContract" Clearable="true" />
+             </MudItem>
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                 <MudDatePicker Margin="margin" Variant="Variant.Outlined" Editable="true" Label="From" @bind-Date="contract.From" DateFormat="@dateFormat" Clearable="true" />
+             </MudItem>
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                 <MudDatePicker Margin="margin" Variant="Variant.Outlined" Editable="true" Label="To" @bind-Date="contract.Until" DateFormat="@dateFormat" Clearable="true" />
+             </MudItem>
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                 <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                     <MudItem xs="9">
+                         <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="CommodityModel"
+                                          Label="Commodity"
+                                          SearchFunc="@SearchCommodity"
+                                          Value="com"
+                                          ValueChanged="CommodityInputChange"
+                                                  Clearable
+                                          ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                          ToStringFunc="@(se=> se is null ? null : $"{se.Commodity}")"
+                                          CoerceText="false"
+                                          CoerceValue="false" />
+                     </MudItem>
+                     <MudItem xs="3">
+                         <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => CommodityOpenDialog(new CommodityModel()))" />
+                     </MudItem>
+                 </MudGrid>
+             </MudItem>
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                 <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                     <MudItem xs="9">
+                         <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="PortModel"
+                                          Label="POL"
+                                          SearchFunc="@SearchPOL"
+                                          Value="pol"
+                                          ValueChanged="POLInputChange"
+                                                  Clearable
+                                          ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                          ToStringFunc="@(se=> se is null ? null : $"{se.Port}")"
+                                          CoerceText="false"
+                                          CoerceValue="false" />
+                     </MudItem>
+                     <MudItem xs="3">
+                         <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => PortOpenDialog(new PortModel()))" />
+                     </MudItem>
+                 </MudGrid>
+             </MudItem>
+
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                    <MudItem xs="9">
+                        <MudAutocomplete Margin="margin" Variant="Variant.Outlined" Clearable T="string" Label="POT1" @bind-Value="contract.POT1" SearchFunc="@SearchPOT1"
+                                         ResetValueOnEmptyText="@_resetValueOnEmptyText" CoerceText="false" CoerceValue="false" />
+                        
+                    </MudItem>
+                    <MudItem xs="3">
+                        <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => PortOpenDialog(new PortModel()))" />
+                    </MudItem>
+                </MudGrid>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                 <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                     <MudItem xs="9">
+                        <MudAutocomplete Margin="margin" Variant="Variant.Outlined" Clearable T="string" Label="POT2" @bind-Value="contract.POT2" SearchFunc="@SearchPOT2"
+                                         ResetValueOnEmptyText="@_resetValueOnEmptyText" CoerceText="false" CoerceValue="false" />
+                     </MudItem>
+                     <MudItem xs="3">
+                         <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => PortOpenDialog(new PortModel()))" />
+                     </MudItem>
+                 </MudGrid>
+             </MudItem>
+
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                    <MudItem xs="9">
+                        <MudAutocomplete Margin="margin" Variant="Variant.Outlined" Clearable T="string" Label="POT3" @bind-Value="contract.POT3" SearchFunc="@SearchPOT3"
+                                         ResetValueOnEmptyText="@_resetValueOnEmptyText" CoerceText="false" CoerceValue="false" />
+                    </MudItem>
+                    <MudItem xs="3">
+                        <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => PortOpenDialog(new PortModel()))" />
+                    </MudItem>
+                </MudGrid>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                    <MudItem xs="9">
+                        <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="PortModel"
+                                         Label="POD"
+                                         SearchFunc="@SearchPOD"
+                                         Value="pod"
+                                         ValueChanged="PODInputChange"
+                                         Clearable
+                                         ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                         ToStringFunc="@(se=> se is null ? null : $"{se.Port}")"
+                                         CoerceText="false"
+                                         CoerceValue="false" />
+                    </MudItem>
+                    <MudItem xs="3">
+                        <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => PortOpenDialog(new PortModel()))" />
+                    </MudItem>
+                </MudGrid>
+            </MudItem>
+             
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                 <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Country" @bind-Value="@Country" ReadOnly />
+             </MudItem>
+
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                 <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="contract.TT" Label="TT" Clearable="true" />
+             </MudItem>
+
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Free Days Origin" @bind-Value="contract.FreeDaysOrigin" Clearable="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Free Days Destination" @bind-Value="contract.FreeDaysDestination" Clearable="true" />
+            </MudItem>
+
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                 <MudNumericField Margin="margin" Variant="Variant.Outlined" Value="contract.Public" TextChanged="PublicChanged" Label="Public" Clearable="true" />
+             </MudItem>
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                 <MudNumericField Margin="margin" Variant="Variant.Outlined" Value="contract.VolumeDiscount" TextChanged="VolumeDiscountChanged" Label="Volume Discount" Clearable="true" />
+             </MudItem>
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                 <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="contract.Net" Label="Net" Clearable="true" />
+             </MudItem>
+
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                 <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="contract.Sum" Label="Sum" ReadOnly />
+             </MudItem>
+
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                 <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="contract.FreeArtemio" Label="Free Artemio" Clearable="true" />
+             </MudItem>
+
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Rate Type" @bind-Value="contract.RateType" Clearable="true" />
+            </MudItem>
+
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                 <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                     <MudItem xs="9">
+                         <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="ServiceModel"
+                                          Label="Service"
+                                          SearchFunc="@SearchService"
+                                          Value="se"
+                                          ValueChanged="ServiceInputChange"
+                                                  Clearable
+                                          ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                          ToStringFunc="@(se=> se is null ? null : $"{se.Service}")"
+                                          CoerceText="false"
+                                          CoerceValue="false" />
+                     </MudItem>
+                     <MudItem xs="3">
+                         <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => ServiceOpenDialog(new ServiceModel()))" />
+                     </MudItem>
+                 </MudGrid>
+             </MudItem>
+
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudSelect Margin="margin" Variant="Variant.Outlined" T="string" @bind-Value="contract.Status" Label="Status" Clearable="true">
+                    <MudSelectItem Value="@("Aprobado")" />
+                    <MudSelectItem Value="@("Pendiente")" />
+                    <MudSelectItem Value="@("Cancelado")" />
+                </MudSelect>
+            </MudItem>
+
+             <MudItem xs="12">
+                 <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Comment" @bind-Value="contract.Comment" Clearable="true" />
+             </MudItem>
+
+             <MudItem xs="12">
+                 <MudCard Elevation="2">
+                     <MudCardHeader Style="background-color: var(--mud-palette-background);">
+                         <CardHeaderContent>
+                             <MudText Typo="Typo.body1">Contract Condition</MudText>
+                         </CardHeaderContent>
+                         <CardHeaderActions>
+                             <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                 <MudMenuItem OnClick="@(() => AddRowContractCondition(new ContractConditionModel()))" Icon="@Icons.Material.Filled.Add" IconSize="Size.Small">Add Row</MudMenuItem>
+                             </MudMenu>
+                         </CardHeaderActions>
+                     </MudCardHeader>
+                     <MudCardContent>
+                         <MudItem xs="12">
+                             <MudTable Items="@listContractConditions" Hover="true" Breakpoint="Breakpoint.Sm" LoadingProgressColor="Color.Primary">
+                                 <HeaderContent>
+                                     <MudTh></MudTh>
+                                     <MudTh></MudTh>
+                                    <MudTh></MudTh>
+                                     <MudTh></MudTh>
+                                     <MudTh></MudTh>
+                                     <MudTh></MudTh>
+                                     <MudTh></MudTh>
+                                    <MudTh></MudTh>
+                                 </HeaderContent>
+                                 <RowTemplate>
+                                    <MudTd DataLabel="Shipper">
+                                        <MudAutocomplete T="ShipperModel" Margin="margin" Variant="Variant.Outlined"
+                                                         Value="@(shipperList.FirstOrDefault(c => c.ShipperId == context.ShipperId))"
+                                                         ValueChanged="@(newValue => ShipperChanged(newValue, context))"
+                                                         SearchFunc="@SearchShipper"
+                                                         ToStringFunc="@(c => c.Shipper)"
+                                                         Label="Shipper"
+                                                         ResetValueOnEmptyText="true"
+                                                         CoerceText="false"
+                                                         CoerceValue="false"
+                                                         Clearable />
+<!--
+
+                                        <MudSelect Margin="margin" Variant="Variant.Outlined" T="int" Label="Shipper" @bind-Value="context.ShipperId" Required="true" RequiredError="Item is required!"
+                                                   ToStringFunc="@(id => shipperList.FirstOrDefault(s => s.ShipperId == id)?.Shipper)">
+                                             @foreach (var item in shipperList)
+                                            {
+                                                <MudSelectItem T="int" Value="@item.ShipperId">@item.Shipper</MudSelectItem>
+                                            }
+                                        </MudSelect>
+-->
+                                    </MudTd>
+                                    <MudTd DataLabel="Intermediary">
+                                        <MudAutocomplete T="IntermediaryModel" Margin="margin" Variant="Variant.Outlined"
+                                                         Value="@(intermediaryList.FirstOrDefault(c => c.IntermediaryId == context.IntermediaryId))"
+                                                         ValueChanged="@(newValue => IntermediaryChanged(newValue, context))"
+                                                         SearchFunc="@SearchIntermediary"
+                                                         ToStringFunc="@(c => c.Intermediary)"
+                                                         Label="Intermediary"
+                                                         ResetValueOnEmptyText="true"
+                                                         CoerceText="false"
+                                                         CoerceValue="false"
+                                                         Clearable />
+<!--
+
+                                        <MudSelect Margin="margin" Variant="Variant.Outlined" T="int" Label="Intermediary" @bind-Value="context.IntermediaryId" Required="true" RequiredError="Item is required!"
+                                                   ToStringFunc="@(id => intermediaryList.FirstOrDefault(i => i.IntermediaryId == id)?.Intermediary)">
+                                            @foreach (var item in intermediaryList)
+                                            {
+                                                <MudSelectItem T="int" Value="@item.IntermediaryId">@item.Intermediary</MudSelectItem>
+                                            }
+                                        </MudSelect>
+-->
+                                    </MudTd>
+                                    <MudTd DataLabel="Public">
+                                        <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.Public" Label="Public" Clearable="true" />
+                                    </MudTd>
+                                    <MudTd DataLabel="Net">
+                                        <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.Net" Label="Net" Clearable="true" OnBlur="@(() => CalculateFee(context))" />
+                                    </MudTd>
+                                    <MudTd DataLabel="FeeShipper">
+                                        <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.FeeShipper" Label="FeeShipper" Clearable="true" />
+                                    </MudTd>
+                                    <MudTd DataLabel="FeeIntermediary">
+                                        <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.FeeIntermediary" Label="FeeIntermediary" Clearable="true" />
+                                    </MudTd>
+                                    <MudTd DataLabel="FeeArtemio">
+                                        <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.FeeArtemio" Label="FeeArtemio" Clearable="true" />
+                                    </MudTd>
+                                    <MudTd DataLabel="Comm">
+                                        <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.Comm" Label="Comm" Clearable="true" />
+                                    </MudTd>
+                                    <MudTd DataLabel="Remove">
+                                        <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                            <MudMenuItem OnClick="@(() => RemoveDtlContractCondition(context))" Icon="@Icons.Material.Filled.DeleteOutline" IconSize="Size.Small">Delete</MudMenuItem>
+                                        </MudMenu>
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        </MudItem>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+             <MudItem xs="12">
+                 <MudCard Elevation="2">
+                     <MudCardHeader Style="background-color: var(--mud-palette-background);">
+                         <CardHeaderContent>
+                             <MudText Typo="Typo.body1">Contract Details</MudText>
+                         </CardHeaderContent>
+                         <CardHeaderActions>
+                             <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                 <MudMenuItem OnClick="@(() => AddRow(new ContractDetailModel()))" Icon="@Icons.Material.Filled.Add" IconSize="Size.Small">Add Row</MudMenuItem>
+                             </MudMenu>
+                         </CardHeaderActions>
+                     </MudCardHeader>
+                     <MudCardContent>
+                         <MudItem xs="12">
+                             <MudTable Items="@listContractDetails" Hover="true" Breakpoint="Breakpoint.Sm" LoadingProgressColor="Color.Primary">
+                                 <HeaderContent>
+                                     <MudTh></MudTh>
+                                     <MudTh></MudTh>
+                                     <MudTh></MudTh>
+                                    <MudTh></MudTh>
+                                     <MudTh></MudTh>
+                                 </HeaderContent>
+                                 <RowTemplate>
+                                     <MudTd DataLabel="Item">
+                                         <MudSelect Margin="margin" Variant="Variant.Outlined" T="int" Label="Item" @bind-Value="context.CostItemId" Required="true" RequiredError="Item is required!"
+                                                    ToStringFunc="@(id => costitemList.FirstOrDefault(c => c.CostItemId == id)?.CostItem)">
+                                             @foreach (var item in costitemList)
+                                            {
+                                                <MudSelectItem T="int" Value="@item.CostItemId">@item.CostItem</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    </MudTd>
+                                    <MudTd DataLabel="Amount">
+                                        <MudNumericField Margin="margin" Variant="Variant.Outlined" @bind-Value="context.Amount" Label="Amount" Clearable="true" OnBlur="Totalizer" />
+                                    </MudTd>
+                                    <MudTd DataLabel="Payment Condition">
+                                        <MudSelect Margin="margin" Variant="Variant.Outlined" T="int" Label="Payment Condition" @bind-Value="context.PaymentConditionId" Required="true" RequiredError="Payment Condition is required!"
+                                                   ToStringFunc="@(id => pcList.FirstOrDefault(p => p.PaymentConditionId == id)?.PaymentCondition)">
+                                            @foreach (var item in pcList)
+                                            {
+                                                <MudSelectItem T="int" Value="@item.PaymentConditionId">@item.PaymentCondition</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    </MudTd>
+                                    <MudTd DataLabel="Include">
+                                        <MudSelect Margin="margin" Variant="Variant.Outlined" T="string" Label="Include" @bind-Value="context.Include" Required="true" RequiredError="Status Contaner is required!" OnBlur="Totalizer">
+                                            <MudSelectItem Value="@("Include")" />
+                                            <MudSelectItem Value="@("Not Include")" />
+                                        </MudSelect>
+                                    </MudTd>
+                                    <MudTd DataLabel="Remove">
+                                        <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                            <MudMenuItem OnClick="@(() => RemoveDtl(context))" Icon="@Icons.Material.Filled.DeleteOutline" IconSize="Size.Small">Delete</MudMenuItem>
+                                        </MudMenu>
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        </MudItem>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+             </MudForm>
+             }
+    </DialogContent>
+     <DialogActions>
+         <MudButton OnClick="Cancel">Cancel</MudButton>
+         <MudButton Disabled="@_processing" OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary">
+             @if (_processing)
+            {
+                <MudProgressCircular Color="Color.Primary" Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Loading</MudText>
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public int id { get; set; } = 0;
+
+    private ContractModel contract = new ContractModel();
+    private List<ContractDetailModel> listContractDetails = new List<ContractDetailModel>();
+    private List<ContractConditionModel> listContractConditions = new List<ContractConditionModel>();
+    public ContractDetailModel cd = new();
+
+    private List<CommodityModel> commodityList = new();
+    private List<PortModel> portList = new();
+    private List<PortModel> polList = new();
+    private List<PortModel> podList = new();
+    private List<SeasonModel> seasonList = new();
+    private List<ServiceModel> serviceList = new();
+    private List<TransportCompanyModel> transportcompanyList = new();
+    private List<CostItemModel> costitemList = new();
+    private List<CountryModel> countryList = new();
+    private List<PaymentConditionModel> pcList = new();
+    private List<InvolvedModel> involvedList = new();
+    private List<IntermediaryModel> intermediaryList = new();
+    private List<ShipperModel> shipperList = new();
+
+    private int seasonId = 0;
+    private bool _processing = false;
+    private MudForm? form;
+    private Margin margin = Margin.Dense;
+    private bool _resetValueOnEmptyText = true;
+    private string Country = "";
+    bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            seasonId = await localStorage.GetItemAsync<int>("season");
+
+            var lst = new List<Task>();
+
+            var commodityAsync = _commodityService.GetAllAsync();
+            var portAsync = _portService.GetAllAsync();
+            var serviceAsync = _serviceService.GetAllAsync();
+            var transportcompanyAsync = _transportcompanyService.GetAllAsync();
+            var costitemAsync = _costitemService.GetAllAsync();
+            var countryAsync = _countryService.GetAllAsync();
+            var pcAsync = _pcService.GetAllAsync();
+            var involvedAsync = _involvedService.GetAllAsync();
+            var intermediaryAsync = _intermediaryService.GetAllAsync();
+            var shipperAsync = _shipperService.GetAllAsync();
+
+            lst.Add(commodityAsync);
+            lst.Add(portAsync);
+            lst.Add(serviceAsync);
+            lst.Add(transportcompanyAsync);
+            lst.Add(costitemAsync);
+            lst.Add(countryAsync);
+            lst.Add(pcAsync);
+            lst.Add(involvedAsync);
+            lst.Add(intermediaryAsync);
+            lst.Add(shipperAsync);
+
+            await Task.WhenAll(lst);
+
+            commodityList = await commodityAsync;
+            portList = await portAsync;
+            serviceList = await serviceAsync;
+            transportcompanyList = await transportcompanyAsync;
+            costitemList = await costitemAsync;
+            countryList = await countryAsync;
+            pcList = await pcAsync;
+            involvedList = await involvedAsync;
+            intermediaryList = await intermediaryAsync;
+            shipperList = await shipperAsync;
+
+            if (id != 0)
+            {
+                contract = await _contractService.GetAsync(id);
+
+                var tc = transportcompanyList.Where(item => item.TransportCompanyId == contract.TransportCompanyId).FirstOrDefault();
+                TransportCompanyInputChange(tc);
+
+                if(contract.ServiceId>0){
+                    var se = serviceList.Where(item => item.ServiceId == contract.ServiceId).FirstOrDefault();
+                    ServiceInputChange(se);
+                }
+
+                var pol = portList.Where(item => item.PortId == contract.POLId).FirstOrDefault();
+                POLInputChange(pol);
+
+                var pod = portList.Where(item => item.PortId == contract.PODId).FirstOrDefault();
+                PODInputChange(pod);
+
+                var com = commodityList.Where(item => item.CommodityId == contract.CommodityId).FirstOrDefault();
+                CommodityInputChange(com);
+
+                listContractDetails = await _contractdtlService.GetAsync(id);
+                listContractConditions = await _contractconditionService.GetAsync(id);
+            }
+            else
+            {
+                contract = new ContractModel();
+                listContractDetails.Clear();
+
+                listContractDetails = new List<ContractDetailModel>();
+
+                listContractConditions.Clear();
+
+                listContractConditions = new List<ContractConditionModel>();
+
+            }
+
+            if (listContractDetails == null)
+            {
+                listContractDetails = new List<ContractDetailModel>();
+                listContractConditions = new List<ContractConditionModel>();
+            }
+
+            if (listContractConditions == null)
+            {
+                listContractConditions = new List<ContractConditionModel>();
+            }
+
+            Totalizer();
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+        isLoading = false;
+    }
+
+    private void Totalizer()
+    {
+        contract.Sum = contract.Public + listContractDetails.Where(e => e.Include == "Not Include").Sum(f => f.Amount);
+    }
+
+    private void CalculateFee(ContractConditionModel cc)
+    {
+        cc.FeeShipper = cc.Public - cc.Net;
+    }
+
+    private void AddRow(ContractDetailModel cd)
+    {
+        cd.Amount = 0;
+        cd.Include = "Include";
+
+        listContractDetails.Add(cd);
+    }
+
+    private void RemoveDtl(ContractDetailModel bd)
+    {
+        listContractDetails.Remove(bd);
+    }
+
+    //AddRowContractCondition
+    private void AddRowContractCondition(ContractConditionModel cc)
+    {
+        cc.Public = contract.Public;
+        cc.Net = 0;
+        cc.FeeShipper = 0;
+        cc.FeeIntermediary = 0;
+        cc.Comm = 0;
+
+
+        listContractConditions.Add(cc);
+    }
+
+    private void RemoveDtlContractCondition(ContractConditionModel bd)
+    {
+        listContractConditions.Remove(bd);
+    }
+    private async Task Submit()
+    {
+
+        if (form is not null)
+        {
+            await form.Validate();
+            if (!form.IsValid)
+            {
+                return;
+            }
+        }
+        _processing = true;
+        
+        Totalizer();
+
+        var x = new ContractModel();
+
+        #region Valid Null
+        if (tc == null)
+        {
+            tc = new TransportCompanyModel();
+        }
+        contract.TransportCompanyId = tc.TransportCompanyId;
+
+        if (se == null)
+        {
+            se = new ServiceModel();
+        }
+        contract.ServiceId = se.ServiceId;
+
+        if (pol == null)
+        {
+            pol = new PortModel();
+        }
+        contract.POLId = pol.PortId;
+
+        if (pod == null)
+        {
+            pod = new PortModel();
+        }
+        contract.PODId = pod.PortId;
+
+        if (com == null)
+        {
+            com = new CommodityModel();
+        }
+        contract.CommodityId = com.CommodityId;
+
+        #endregion
+
+
+        if (contract.POT1 == null) contract.POT1 = "";
+        if (contract.POT2 == null) contract.POT2 = "";
+        if (contract.POT3 == null) contract.POT3 = "";
+
+        if (contract.ContractId == 0)
+        {
+            contract.SeasonId = seasonId;
+
+            x = await _contractService.PostAsync(contract);
+
+        }
+        else
+        {
+            x = await _contractService.PutAsync(contract);
+        }
+
+        await _contractdtlService.DeleteAsync(x.ContractId);
+
+        foreach (var item in listContractDetails)
+        {
+            item.ContractId = x.ContractId;
+
+            var resp = await _contractdtlService.PostAsync(item);
+        }
+
+        await _contractconditionService.DeleteAsync(x.ContractId);
+
+        foreach (var item in listContractConditions)
+        {
+            item.ContractId = x.ContractId;
+
+            var resp = await _contractconditionService.PostAsync(item);
+        }
+
+        _processing = false;
+        if (x == null)
+        {
+            Snackbar.Add("Could not save. Please try again.", Severity.Error);
+            return;
+        }
+        MudDialog.Close(true);
+    }
+
+    void Cancel() => MudDialog.Cancel();
+
+    #region Modales
+    private async Task ContractConditionOpenDialog(int id)
+    {
+        var parameters = new DialogParameters<ContractConditionForm> { { x => x.id, id } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Large, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<ContractConditionForm>("contract", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            isLoading = true;
+
+            //await FillData();
+
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    private async Task TransportCompanyOpenDialog(TransportCompanyModel s)
+    {
+        var parameters = new DialogParameters<TransportCompanyForm> { { x => x.transportcompany, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<TransportCompanyForm>("Shipping Company", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            transportcompanyList = await _transportcompanyService.GetAllAsync();
+        }
+    }
+    private async Task ServiceOpenDialog(ServiceModel s)
+    {
+        var parameters = new DialogParameters<ServiceForm> { { x => x.service, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<ServiceForm>("Service", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            serviceList = await _serviceService.GetAllAsync();
+        }
+    }
+    private async Task PortOpenDialog(PortModel s)
+    {
+        var parameters = new DialogParameters<PortForm> { { x => x.port, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<PortForm>("Port", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            portList = await _portService.GetAllAsync();
+        }
+    }
+    private async Task CommodityOpenDialog(CommodityModel s)
+    {
+        var parameters = new DialogParameters<CommodityForm> { { x => x.commodity, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<CommodityForm>("Commodity", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            commodityList = await _commodityService.GetAllAsync();
+        }
+    }
+    #endregion
+
+    #region Search Autocomplete
+    private async Task<IEnumerable<ShipperModel>> SearchShipper(string value, CancellationToken token)
+    {
+        // Si no hay valor de búsqueda, retorna todos los datos
+        if (string.IsNullOrEmpty(value))
+            return shipperList;
+
+        // Filtra datos basado en el texto de búsqueda
+        return shipperList
+            .Where(x => x.Shipper.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+    private void ShipperChanged(ShipperModel? newValue, ContractConditionModel contractCondition)
+    {
+        if (newValue != null)
+        {
+            contractCondition.ShipperId = newValue.ShipperId;
+            StateHasChanged();
+        }
+    }
+
+    private async Task<IEnumerable<IntermediaryModel>> SearchIntermediary(string value, CancellationToken token)
+    {
+        // Si no hay valor de búsqueda, retorna todos los datos
+        if (string.IsNullOrEmpty(value))
+            return intermediaryList;
+
+        // Filtra datos basado en el texto de búsqueda
+        return intermediaryList
+            .Where(x => x.Intermediary.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+    private void IntermediaryChanged(IntermediaryModel? newValue, ContractConditionModel contractCondition)
+    {
+        if (newValue != null)
+        {
+            contractCondition.IntermediaryId = newValue.IntermediaryId;
+            StateHasChanged();
+        }
+    }
+
+    private TransportCompanyModel tc = new();
+    private async Task TransportCompanyInputChange(TransportCompanyModel item)
+    {
+        if (item == null) item = new TransportCompanyModel();
+
+        tc = item;
+        contract.TransportCompanyId = item.TransportCompanyId;
+
+        serviceList = await _transportcompanyserviceService.GetAllAssignedAsync(tc.TransportCompanyId);
+        polList = await _transportcompanypolService.GetAllAssignedAsync(tc.TransportCompanyId);
+        podList = await _transportcompanypodService.GetAllAssignedAsync(tc.TransportCompanyId);
+    }
+    private async Task<IEnumerable<TransportCompanyModel>> SearchTransportCompany(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return transportcompanyList.ToArray();
+        return transportcompanyList.Where(x => x.TransportCompany.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private ServiceModel se = new();
+    private async void ServiceInputChange(ServiceModel item)
+    {
+        if (item == null) item = new ServiceModel();
+
+        se = item;
+        contract.ServiceId = item.ServiceId;
+    }
+    private async Task<IEnumerable<ServiceModel>> SearchService(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return serviceList.ToArray();
+        return serviceList.Where(x => x.Service.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+
+    private PortModel pol = new();
+    async void POLInputChange(PortModel item)
+    {
+        if (item == null) item = new PortModel();
+        pol = item;
+        contract.POLId = item.PortId;
+    }
+    private async Task<IEnumerable<PortModel>> SearchPOL(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return polList.ToArray();
+        return polList.Where(x => x.Port.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private PortModel pod = new();
+    async void PODInputChange(PortModel item)
+    {
+        if (item == null) item = new PortModel();
+
+        pod = item;
+        contract.PODId = item.PortId;
+
+        if (item.PortId > 0)
+        {
+            Country = countryList.Where(c => c.CountryId == item.CountryId).FirstOrDefault().Country;
+        }
+        else
+        {
+            Country = "";
+        }
+    }
+    private async Task<IEnumerable<PortModel>> SearchPOD(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return podList.ToArray();
+        return podList.Where(x => x.Port.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private CommodityModel com = new();
+    async void CommodityInputChange(CommodityModel item)
+    {
+        if (item == null) item = new CommodityModel();
+
+        com = item;
+        contract.CommodityId = item.CommodityId;
+    }
+    private async Task<IEnumerable<CommodityModel>> SearchCommodity(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return commodityList.ToArray();
+        return commodityList.Where(x => x.Commodity.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+    #endregion
+
+    void PublicChanged(string value)
+    {
+        contract.Public = Convert.ToDecimal(value);
+        contract.Net = contract.Public - contract.VolumeDiscount;
+        StateHasChanged();
+    }
+
+    void VolumeDiscountChanged(string value)
+    {
+        contract.VolumeDiscount = Convert.ToDecimal(value);
+        contract.Net = contract.Public - contract.VolumeDiscount;
+        StateHasChanged();
+    }
+
+    string dateFormat = "dd/MM/yyyy";
+    string bound = "not set";
+
+    private void DatePickerTextChanged(string value)
+    {
+        if (value == null || value.Length < 6)
+        {
+            contract.From = null;
+        }
+        else
+        {
+            string[] formats = { "ddMMyy", "dd/MM/yyyy", "dd/M/yyyy", "d/MM/yyyy", "d/M/yyyy", "dd/MM/yy", "dd/M/yy", "d/MM/yy", "d/M/yy" };
+            if (DateTime.TryParseExact(value, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime validDate))
+            {
+                contract.From = validDate;
+            }
+            else
+            {
+                contract.From = null;
+            }
+        }
+
+        if (contract.From.HasValue)
+        {
+            bound = contract.From.Value.ToString(dateFormat);
+        }
+        else
+        {
+            bound = "not set";
+        }
+    }
+
+    private async Task<IEnumerable<string>> SearchPOT1(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return portList.Select(e => e.Port).ToArray();
+        return portList.Where(x => x.Port.Contains(value, StringComparison.InvariantCultureIgnoreCase)).Select(e => e.Port).ToArray();
+    }
+    private async Task<IEnumerable<string>> SearchPOT2(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return portList.Select(e => e.Port).ToArray();
+        return portList.Where(x => x.Port.Contains(value, StringComparison.InvariantCultureIgnoreCase)).Select(e => e.Port).ToArray();
+    }
+    private async Task<IEnumerable<string>> SearchPOT3(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return portList.Select(e => e.Port).ToArray();
+        return portList.Where(x => x.Port.Contains(value, StringComparison.InvariantCultureIgnoreCase)).Select(e => e.Port).ToArray();
+    }
+
+    private Snackbar _snackbar;
+
+    void Show(string msg, Severity severity)
+    {
+        Snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomCenter;
+        _snackbar = Snackbar.Add(msg, severity);
+    }
+}

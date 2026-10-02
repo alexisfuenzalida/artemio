@@ -1,0 +1,263 @@
+﻿@using System;
+@using System.Globalization;
+
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+@using ArtemioBlazorWA.Forms;
+
+@inject StackingService _stackingService
+@inject TransportCompanyService _transportcompanyService
+@inject TransportCompanyServiceService _transportcompanyserviceService
+@inject ServiceService _serviceService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            Stacking
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <FormSkeleton Rows="8" Columns="4" />
+        }
+        else
+        {
+<MudForm @ref="form">
+
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudNumericField @bind-Value="stacking.Week" Label="Week" Required="true" RequiredError="Week is required!" />
+            </MudItem>
+            <!--
+
+            <MudItem xs="12" sm="6" md="4">
+                <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                    <MudItem xs="9">
+                        <MudAutocomplete Variant="Variant.Outlined" T="TransportCompanyModel"
+                                         Label="Ship. Company"
+                                         MaxItems="null"
+                                         SearchFunc="@SearchTransportCompany"
+                                                  Clearable
+                                          Value="tc"
+                                          ValueChanged="TransportCompanyInputChange"
+                                          ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                          ToStringFunc="@(tc => tc is null ? null : $"{tc.TransportCompany}")"
+                                          CoerceText="false"
+                                          CoerceValue="false" />
+                     </MudItem>
+                     <MudItem xs="3">
+                         <MudFab Margin="Margin.Dense" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => TransportCompanyOpenDialog(new TransportCompanyModel()))" />
+                     </MudItem>
+
+                 </MudGrid>
+             </MudItem>
+            -->
+            <MudItem xs="12" sm="6">
+                 <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                     <MudItem xs="9">
+                         <MudAutocomplete Variant="Variant.Outlined" T="ServiceModel"
+                                          Label="Service"
+                                          MaxItems="null"
+                                          SearchFunc="@SearchService"
+                                          Value="se"
+                                          ValueChanged="ServiceInputChange"
+                                                  Clearable
+                                          ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                          ToStringFunc="@(se=> se is null ? null : $"{se.Service}")"
+                                          CoerceText="false"
+                                          CoerceValue="false" />
+                     </MudItem>
+                     <MudItem xs="3">
+                         <MudFab StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => ServiceOpenDialog(new ServiceModel()))" />
+                     </MudItem>
+                 </MudGrid>
+             </MudItem>
+
+             <MudItem xs="12" sm="6">
+                 <MudTextField Variant="Variant.Outlined" T="string" Label="Stacking" InputType="InputType.Text" @bind-Value="stacking.Stacking" Clearable="true" />
+             </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudTextField Variant="Variant.Outlined" T="string" Label="Late Arrival" InputType="InputType.Text" @bind-Value="stacking.LateArrival" Clearable="true" />
+            </MudItem>
+            <MudItem sm="6">
+                <MudTextField Variant="Variant.Outlined" T="string" Label="Extra Late Arrival" InputType="InputType.Text" @bind-Value="stacking.ExtraLateArrival" Clearable="true" />
+            </MudItem>
+
+            <MudItem sm="6">
+                <MudTextField Variant="Variant.Outlined" T="string" Label="Cut Off" InputType="InputType.Text" @bind-Value="stacking.CutOff" Clearable="true" />
+            </MudItem>
+         </MudGrid>
+             </MudForm>
+             }
+    </DialogContent>
+     <DialogActions>
+         <MudButton OnClick="Cancel">Cancel</MudButton>
+         <MudButton Disabled="@_processing" OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary">
+             @if (_processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Processing</MudText>
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public StackingModel stacking { get; set; } = new StackingModel();
+
+    private List<TransportCompanyModel> transportcompanyList = new();
+    private List<ServiceModel> serviceList = new();
+
+    private bool _processing = false;
+    private MudForm? form;
+    private bool isLoading = true;
+    private bool _resetValueOnEmptyText = true;
+
+    private IEnumerable<string> stack = new[] { "Mon", "Tue","Wed","Thu","Fra","Sat","Sun" };
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+
+            //transportcompanyList = await _transportcompanyService.GetAllAsync();
+            serviceList = await _serviceService.GetAllAsync();
+
+            /*
+             * 
+            if (transportcompanyList == null)
+            {
+                transportcompanyList = new List<TransportCompanyModel>();
+            }
+             */
+            if (serviceList == null)
+            {
+                serviceList = new List<ServiceModel>();
+            }
+
+            if (stacking.StackingId > 0)
+            {
+                //var tc = transportcompanyList.Where(item => item.TransportCompanyId == stacking.TransportCompanyId).FirstOrDefault();
+                //TransportCompanyInputChange(tc);
+
+                var se = serviceList.Where(item => item.ServiceId == stacking.ServiceId).FirstOrDefault();
+                ServiceInputChange(se);
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+        isLoading = false;
+    }
+
+
+    private async Task Submit()
+    {
+
+        if (form is not null)
+        {
+            await form.Validate();
+            if (!form.IsValid)
+            {
+                return;
+            }
+        }
+        var x = new StackingModel();
+
+        _processing = true;
+
+        if (stacking.StackingId == 0)
+        {
+            x = await _stackingService.PostAsync(stacking);
+        }
+        else
+        {
+            x = await _stackingService.PutAsync(stacking);
+        }
+
+        _processing = false;
+        if (x == null)
+        {
+            Snackbar.Add("Could not save. Please try again.", Severity.Error);
+            return;
+        }
+        MudDialog.Close(true);
+    }
+
+    void Cancel() => MudDialog.Cancel();
+
+    private async Task TransportCompanyOpenDialog(TransportCompanyModel s)
+    {
+        var parameters = new DialogParameters<TransportCompanyForm> { { x => x.transportcompany, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<TransportCompanyForm>("Transport Company", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            transportcompanyList = await _transportcompanyService.GetAllAsync();
+        }
+    }
+    private async Task ServiceOpenDialog(ServiceModel s)
+    {
+        var parameters = new DialogParameters<ServiceForm> { { x => x.service, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<ServiceForm>("Service", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            serviceList = await _serviceService.GetAllAsync();
+        }
+    }
+
+    /*
+    private TransportCompanyModel tc = new();
+    private async Task TransportCompanyInputChange(TransportCompanyModel item)
+    {
+        if (item == null) return;
+
+        tc = item;
+        stacking.TransportCompanyId = item.TransportCompanyId;
+
+        serviceList = await _transportcompanyserviceService.GetAllAssignedAsync(tc.TransportCompanyId);
+    }
+    private async Task<IEnumerable<TransportCompanyModel>> SearchTransportCompany(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return transportcompanyList.ToArray();
+        return transportcompanyList.Where(x => x.TransportCompany.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+     */
+
+    private ServiceModel se = new();
+    async void ServiceInputChange(ServiceModel item)
+    {
+        if(item == null) return;
+
+        se = item;
+        stacking.ServiceId = item.ServiceId;
+    }
+    private async Task<IEnumerable<ServiceModel>> SearchService(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return serviceList.ToArray();
+        return serviceList.Where(x => x.Service.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+}

@@ -1,0 +1,25 @@
+﻿<MudPaper Width="250px" Elevation="0">
+    <MudNavMenu Color="Color.Primary" Bordered="true">
+        <MudNavGroup Title="HOME" Expanded="true">
+            <MudNavLink Href="/tta" Match="NavLinkMatch.Prefix">TTA</MudNavLink>
+        </MudNavGroup>
+        <MudDivider Class="my-5" />
+    </MudNavMenu>
+</MudPaper>
+
+
+@code {
+    private bool collapseNavMenu = true;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+
+    private void OnClick(string href)
+    {
+        Console.WriteLine(href);
+    }
+}

@@ -1,0 +1,130 @@
+﻿@page "/invoices"
+
+@using ArtemioBlazorWA.Forms;
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject InvoiceService _invoiceService
+@inject IDialogService DialogService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+@inject ISnackbar Snackbar
+
+<EntityGridPage T="InvoiceGrid"
+                 Title="Invoices"
+                 Items="@invoiceList"
+                 IsLoading="@isLoading"
+                 @bind-SearchString="_searchString"
+                 QuickFilter="@_quickFilter"
+                 CreateLabel="Create"
+                 OnCreate="@(() => OpenDialog(0))"
+                 EmptyMessage="No hay resultados.">
+    <NoRecordsContent>
+        <MudPaper Class="pa-6 d-flex align-center justify-center" Style="min-height:120px;">
+            <MudText Typo="Typo.subtitle1">Data not found</MudText>
+        </MudPaper>
+    </NoRecordsContent>
+    <Columns>
+        <PropertyColumn Property="x => x.Date.ToString(format)" Title="Date" Filterable="false" />
+        <PropertyColumn Property="x => x.Type" Filterable="false" />
+        <PropertyColumn Property="x => x.Number" Filterable="false" />
+        <PropertyColumn Property="x => x.Bookings" Title="Bookings" Filterable="false" />
+        <PropertyColumn Property="x => x.Amount" Filterable="false" />
+        <PropertyColumn Property="x => x.Observation" Filterable="false" />
+        <TemplateColumn CellClass="d-flex justify-center" Sortable="false" Filterable="false">
+            <CellTemplate>
+                <MudStack Row>
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                        <MudMenuItem OnClick="@(() => OpenDialog(context.Item.InvoiceId))" Icon="@Icons.Material.Filled.Edit" IconSize="Size.Small">Edit</MudMenuItem>
+                        <MudMenuItem OnClick="@(() => OnDelete(context.Item.InvoiceId))" Icon="@Icons.Material.Filled.Delete" IconSize="Size.Small">Delete</MudMenuItem>
+                    </MudMenu>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+</EntityGridPage>
+
+@code {
+    List<InvoiceGrid> invoiceList = new();
+
+    private int seasonId = 0;
+    private string _searchString;
+    bool isLoading = true;
+    string format = "dd/MM/yyyy";
+
+    async Task FillData()
+    {
+        invoiceList = await _invoiceService.GetAllAsync(seasonId) ?? new List<InvoiceGrid>();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await localStorage.SetItemAsync<string>("last", "invoices");
+            isLoading = true;
+            seasonId = await localStorage.GetItemAsync<int>("season");
+            await FillData();
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OpenDialog(int invoiceId)
+    {
+        var invoice = new InvoiceModel { InvoiceId = invoiceId, Date = DateTime.Today };
+        var parameters = new DialogParameters<InvoiceForm> { { x => x.invoice, invoice } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Large, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<InvoiceForm>("Invoice", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            isLoading = true;
+            await FillData();
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async void OnDelete(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete",
+            "Confirm to delete item?",
+            yesText: "Delete", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            await _invoiceService.DeleteAsync(id);
+            isLoading = true;
+            await FillData();
+            isLoading = false;
+            StateHasChanged();
+        }
+
+        StateHasChanged();
+    }
+
+    private Func<InvoiceGrid, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.Type.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Number.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Bookings.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Observation.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Amount.ToString().Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Date.ToString(format).Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+}

@@ -1,0 +1,166 @@
+﻿@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+@using ArtemioBlazorWA.Forms;
+
+@inject TtaService _ttaService
+@inject BookingService _bookingService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            Tta
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <FormSkeleton Rows="3" />
+        }
+        else
+        {
+
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudAutocomplete T="BookingModel" Margin="margin" Variant="Variant.Outlined"
+                    Value="@(bookingList.FirstOrDefault(c => c.BookingId == tta.BookingId))"
+                    ValueChanged="@(newValue => BookingChanged(newValue, tta))"
+                    SearchFunc="@SearchBooking"
+                    ToStringFunc="@(c => c.NroBooking)"
+                    Label="Nro Booking"
+                    ResetValueOnEmptyText="true"
+                    CoerceText="false"
+                    CoerceValue="false"
+                    Clearable />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Container" @bind-Value="tta.Container" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Sello" @bind-Value="tta.Sello" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Packing" @bind-Value="tta.Packing" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudDatePicker Margin="margin" Variant="Variant.Outlined" @bind-Date="tta.FechaCarga" Label="Fecha Carga" DateFormat="@dateFormat" Clearable="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Rut" @bind-Value="tta.Rut" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Conductor" @bind-Value="tta.Conductor" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Telefono" @bind-Value="tta.Telefono" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" Label="Patente" @bind-Value="tta.Patente" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudTextField Margin="margin" Variant="Variant.Outlined" T="int" Label="Tara" @bind-Value="tta.Tara" />
+            </MudItem>
+        </MudGrid>
+            }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Disabled="@_processing" OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary">
+            @if (_processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Processing</MudText>
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public TtaModel tta { get; set; } = new TtaModel();
+
+    private List<BookingModel> bookingList = new();
+
+    private Margin margin = Margin.Dense;
+    private bool _processing = false;
+    private bool isLoading = true;
+    string dateFormat = "dd/MM/yyyy";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var lst = new List<Task>();
+
+            var bookingAsync = _bookingService.GetAllAsync();
+            lst.Add(bookingAsync);
+
+            await Task.WhenAll(lst);
+
+            bookingList = await bookingAsync;
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+        isLoading = false;
+    }
+
+
+    private async Task Submit()
+    {
+        var x = new TtaModel();
+
+        _processing = true;
+
+        if (tta.Id == 0)
+        {
+            x = await _ttaService.PostAsync(tta);
+        }
+        else
+        {
+            x = await _ttaService.PutAsync(tta);
+        }
+
+        _processing = false;
+        if (x == null)
+        {
+            Snackbar.Add("Could not save. Please try again.", Severity.Error);
+            return;
+        }
+        MudDialog.Close(true);
+    }
+
+    void Cancel() => MudDialog.Cancel();
+
+    #region Search Autocomplete
+    private async Task<IEnumerable<BookingModel>> SearchBooking(string value, CancellationToken token)
+    {
+        // Si no hay valor de búsqueda, retorna todos los datos
+        if (string.IsNullOrEmpty(value))
+            return bookingList;
+
+        // Filtra datos basado en el texto de búsqueda
+        return bookingList
+            .Where(x => x.NroBooking.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+    private void BookingChanged(BookingModel? newValue, TtaModel tta)
+    {
+        if (newValue != null)
+        {
+            tta.BookingId = newValue.BookingId;
+            StateHasChanged();
+        }
+    }
+    #endregion
+}

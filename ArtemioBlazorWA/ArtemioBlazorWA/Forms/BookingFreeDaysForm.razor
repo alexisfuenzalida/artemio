@@ -1,0 +1,243 @@
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+@using System.Text.RegularExpressions;
+
+@inject BookingService _bookingService
+@inject CountryService _countryService
+@inject PortService _portService
+@inject UserService _userService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            Booking Free Days
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <GridSkeleton />
+        }
+        else
+        {
+
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudAutocomplete T="CountryModel"
+                                 Label="Country"
+                                 Margin="margin"
+                                 Variant="Variant.Outlined"
+                                 Value="selectedCountry"
+                                 ValueChanged="OnCountryChanged"
+                                 SearchFunc="SearchCountries"
+                                 ToStringFunc="@(x => x?.Country)"
+                                 Clearable="true"
+                                 ResetValueOnEmptyText="true"
+                                 CoerceText="true"
+                                 CoerceValue="true"
+                                 Required="true"
+                                 RequiredError="Country is required!" />
+            </MudItem>
+            <MudItem xs="12" md="4" Class="d-flex align-end">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Search"
+                           OnClick="LoadData"
+                           Disabled="@isLoading">
+                    Load
+                </MudButton>
+            </MudItem>
+
+            @if (showGrid)
+            {
+                <MudItem xs="12">
+                    <MudDataGrid T="BookingGrid"
+                                 Items="@bookingFilteredList"
+                                 Hover
+                                 Dense="true"
+                                 Loading="@isLoading"
+                                 LoadingProgressColor="Color.Primary"
+                                 MultiSelection="true"
+                                 @bind-SelectedItems="selectedBooking">
+                        <Columns>
+                            <SelectColumn T="BookingGrid" />
+                            <PropertyColumn Property="x => x.POD" Title="POD" HeaderStyle="font-weight: bold;" />
+                            <PropertyColumn Property="x => x.BL" Title="BL" HeaderStyle="font-weight: bold;" />
+                            <PropertyColumn Property="x => x.Vessel" Title="Vessel" HeaderStyle="font-weight: bold;" />
+                            <PropertyColumn Property="x => x.ETD.HasValue ? x.ETD.Value.ToString(dateFormat) : string.Empty" Title="ETD" HeaderStyle="font-weight: bold;" />
+                        </Columns>
+                        <PagerContent>
+                            <MudDataGridPager T="BookingGrid" />
+                        </PagerContent>
+                    </MudDataGrid>
+                </MudItem>
+            }
+        </MudGrid>
+            }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Send"
+                   OnClick="OnSendMultiple"
+                   Disabled="@isLoading">
+            Send Email
+        </MudButton>
+        <MudButton OnClick="Cancel">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+    private List<CountryModel> countryList = new();
+    private List<PortModel> portList = new();
+    private List<BookingGrid> bookingFilteredList = new();
+    private HashSet<BookingGrid> selectedBooking = new();
+
+    private CountryModel? selectedCountry;
+    private int selectedCountryId = 0;
+    private string Email = "";
+    private bool isLoading = true;
+    private bool showGrid = false;
+    private const string dateFormat = "dd/MM/yyyy";
+    private Margin margin = Margin.Dense;
+    protected override async Task OnInitializedAsync()
+    {
+        var countriesAsync = _countryService.GetAllAsync();
+        var portsAsync = _portService.GetAllAsync();
+        var usersAsync = _userService.GetAllAsync();
+        var currentUserAsync = localStorage.GetItemAsync<string>("user").AsTask();
+
+        await Task.WhenAll(countriesAsync, portsAsync, usersAsync, currentUserAsync);
+
+        countryList = (await countriesAsync ?? new()).OrderBy(x => x.Country).ToList();
+        portList = await portsAsync ?? new();
+
+        var users = await usersAsync ?? new();
+        var currentUser = await currentUserAsync;
+        Email = users.FirstOrDefault(x => x.User == currentUser)?.Email ?? "";
+        isLoading = false;
+    }
+
+    private async Task LoadData()
+    {
+        if (selectedCountryId <= 0)
+        {
+            Show("Select a country first", Severity.Warning);
+            return;
+        }
+
+        isLoading = true;
+        showGrid = true;
+        selectedBooking.Clear();
+
+        var (bookingGrid, loadError) = await _bookingService.GetBookingSendDaysGridAsync();
+        if (!string.IsNullOrWhiteSpace(loadError))
+        {
+            Show(loadError, Severity.Error);
+            isLoading = false;
+            return;
+        }
+
+        var countryPorts = portList
+            .Where(x => x.CountryId == selectedCountryId)
+            .Select(x => x.Port)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        bookingFilteredList = bookingGrid
+            .Where(x => !string.IsNullOrWhiteSpace(x.POD) && countryPorts.Contains(x.POD))
+            .Where(x => string.Equals(x.ShippingCompany, "Wan Hai", StringComparison.OrdinalIgnoreCase))
+            .Where(x => !string.IsNullOrWhiteSpace(x.BL) && x.BL != "-" && !IsGenericBl(x.BL))
+            .ToList();
+
+        isLoading = false;
+    }
+
+    private static bool IsGenericBl(string bl) => Regex.IsMatch(bl.Trim(), @"^BL\d+$", RegexOptions.IgnoreCase);
+
+    private Task<IEnumerable<CountryModel>> SearchCountries(string value, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return Task.FromResult<IEnumerable<CountryModel>>(countryList);
+
+        var result = countryList.Where(x => x.Country.Contains(value, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult<IEnumerable<CountryModel>>(result);
+    }
+
+    private void OnCountryChanged(CountryModel? value)
+    {
+        selectedCountry = value;
+        selectedCountryId = value?.CountryId ?? 0;
+    }
+
+    private async Task OnSendMultiple()
+    {
+        if (selectedBooking.Count < 1)
+        {
+            Show("Select at least one BL", Severity.Warning);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(Email))
+        {
+            Show("No email found for logged user", Severity.Warning);
+            return;
+        }
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+        bool? result = await DialogService.ShowMessageBox(
+            "Send",
+            $"Confirm to send {selectedBooking.Count} BL to {Email}?",
+            yesText: "Send", cancelText: "Cancel", options: options);
+
+        if (result != true)
+        {
+            return;
+        }
+
+        isLoading = true;
+
+        var request = new BookingSendDaysRequestModel
+        {
+            Email = Email,
+            Country = selectedCountry?.Country ?? "",
+            CountryId = selectedCountryId,
+            Items = selectedBooking
+                .Select(x => new BookingSendDaysItemModel
+                {
+                    BookingId = x.BookingId,
+                    BL = (x.BL ?? "").Trim()
+                })
+                .Where(x => x.BookingId > 0 && !string.IsNullOrWhiteSpace(x.BL) && x.BL != "-")
+                .ToList()
+        };
+
+        if (request.Items.Count == 0)
+        {
+            Show("Selected rows have no BL", Severity.Warning);
+            isLoading = false;
+            return;
+        }
+
+        var (ok, message) = await _bookingService.PostSendBookingFreeDaysAsync(request);
+        Show(string.IsNullOrWhiteSpace(message) ? "Error" : message, ok ? Severity.Info : Severity.Error);
+
+        selectedBooking.Clear();
+        await LoadData();
+        isLoading = false;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private Snackbar _snackbar;
+
+    private void Show(string msg, Severity severity)
+    {
+        Snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomCenter;
+        _snackbar = Snackbar.Add(msg, severity);
+    }
+}

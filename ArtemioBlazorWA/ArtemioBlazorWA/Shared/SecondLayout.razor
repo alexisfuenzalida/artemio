@@ -1,0 +1,71 @@
+﻿@inherits LayoutComponentBase
+@implements IDisposable
+@using ArtemioBlazorWA.Theme
+@using ArtemioBlazorWA.Services
+
+<MudThemeProvider Theme="AppTheme.Default" IsDarkMode="ThemeService.IsDarkMode" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudPopoverProvider />
+
+@inject NavigationManager navigationManager
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject JwtAuthStateProvider AuthState
+@inject ThemeService ThemeService
+
+<MudLayout>
+    <MudMainContent>
+        <MudStack Row="true" Justify="Justify.FlexEnd" Class="pa-2">
+            <MudIconButton Icon="@(ThemeService.IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                            Color="Color.Inherit"
+                            OnClick="@(() => ThemeService.ToggleAsync())"
+                            aria-label="Toggle dark mode" />
+        </MudStack>
+        <MudPaper Style="background-color: transparent;" Elevation="0">
+            <MudContainer MaxWidth="MaxWidth.Small" Style="background-color: transparent;" Class="mt-3">
+                @Body
+            </MudContainer>
+        </MudPaper>
+    </MudMainContent>
+</MudLayout>
+@code {
+
+    protected override async Task OnInitializedAsync()
+    {
+        ThemeService.OnChange += OnThemeChanged;
+        await ThemeService.InitializeAsync();
+    }
+
+    void OnThemeChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        ThemeService.OnChange -= OnThemeChanged;
+    }
+
+    async Task Valida()
+    {
+        var rememberme = await localStorage.GetItemAsync<bool>("rememberme");
+        if (!rememberme)
+        {
+            return;
+        }
+
+        var state = await AuthState.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated == true)
+        {
+            navigationManager.NavigateTo("/booking", replace: true);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Valida();
+        }
+    }
+}

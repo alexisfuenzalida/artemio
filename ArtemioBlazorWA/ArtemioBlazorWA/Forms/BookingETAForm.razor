@@ -1,0 +1,75 @@
+﻿@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject BookingETAService _bookingetaService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            Update ETA
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <FormSkeleton Rows="3" />
+        }
+        else
+        {
+
+        <MudGrid>
+            <MudItem xs="12">
+                <MudDatePicker Variant="Variant.Outlined" Label="ETA" @bind-Date="booking.ETA" DisableToolbar="true" ShowWeekNumbers="true" />
+            </MudItem>
+        </MudGrid>
+            }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Disabled="@_processing" OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary">
+            @if (_processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Processing</MudText>
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public BookingETAModel booking { get; set; } = new BookingETAModel();
+
+    private List<BookingETAModel> bookingETAList = new();
+
+    private bool _processing = false;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        bookingETAList = await _bookingetaService.GetAllAsync(booking.BookingId);
+
+        booking.Nro = bookingETAList.Count() + 1;
+
+        StateHasChanged();
+        isLoading = false;
+    }
+
+    private async Task Submit()
+    {
+        var x = new BookingETAModel();
+
+        _processing = true;
+
+        x = await _bookingetaService.PostAsync(booking);
+        
+        _processing = false;
+        MudDialog.Close(DialogResult.Ok(x.ETA));
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}

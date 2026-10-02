@@ -1,0 +1,21 @@
+<MudChip T="string" Color="@GetColor()" Variant="Variant.Filled" Size="Size.Small" Icon="@GetIcon()">@Status</MudChip>
+
+@code {
+    [Parameter] public string? Status { get; set; }
+
+    private Color GetColor() => Status?.Trim().ToLowerInvariant() switch
+    {
+        "activo" or "confirmado" or "aprobado" => Color.Success,
+        "pendiente" => Color.Warning,
+        "cancelado" or "rechazado" => Color.Error,
+        _ => Color.Default,
+    };
+
+    private string GetIcon() => Status?.Trim().ToLowerInvariant() switch
+    {
+        "activo" or "confirmado" or "aprobado" => Icons.Material.Filled.CheckCircle,
+        "pendiente" => Icons.Material.Filled.Schedule,
+        "cancelado" or "rechazado" => Icons.Material.Filled.Cancel,
+        _ => Icons.Material.Filled.Circle,
+    };
+}

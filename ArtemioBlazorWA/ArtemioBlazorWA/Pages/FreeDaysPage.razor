@@ -1,0 +1,174 @@
+﻿@page "/freedays"
+
+@using ArtemioBlazorWA.Forms;
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject FreeDaysService _freedayService
+@inject TransportCompanyService _transportcompanyService
+@inject CountryService _countryService
+
+
+@inject IDialogService DialogService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject ISnackbar Snackbar
+
+<EntityGridPage T="FreeDaysGrid"
+                 Title="Free Days"
+                 Items="@freedaysGrid"
+                 IsLoading="@isLoading"
+                 @bind-SearchString="_searchString"
+                 QuickFilter="@_quickFilter"
+                 CreateLabel="Create"
+                 OnCreate="@(() => OpenDialog(0))"
+                 EmptyMessage="No hay resultados.">
+    <Columns>
+        <PropertyColumn Property="x => x.Id" Title="Id" />
+        <PropertyColumn Property="x => x.TransportCompany" Title="Shipping Co" />
+        <PropertyColumn Property="x => x.Country" Title="Country" />
+        <PropertyColumn Property="x => x.FreeDays" Title="FreeDays" />
+        <TemplateColumn CellClass="d-flex justify-center" Sortable="false" Filterable="false">
+            <CellTemplate>
+                <MudStack Row>
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                        <MudMenuItem OnClick="@(() => OpenDialog(context.Item.Id))" Icon="@Icons.Material.Filled.Edit" IconSize="Size.Small">Edit</MudMenuItem>
+                        <MudMenuItem OnClick="@(() => OnDelete(context.Item.Id))" Icon="@Icons.Material.Filled.Delete" IconSize="Size.Small">Delete</MudMenuItem>
+                    </MudMenu>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+</EntityGridPage>
+
+
+@code {
+    private List<FreeDaysModel> freedaysList = new();
+    private List<FreeDaysGrid> freedaysGrid = new();
+    private List<TransportCompanyModel> transportcompanyList = new();
+    private List<CountryModel> countryList = new();
+
+    private FreeDaysModel data = new();
+    private string _searchString;
+    private bool _sortNameByLength;
+    bool isLoading = true;
+
+    async Task FillData()
+    {
+        var lst = new List<Task>();
+
+        var freedaysAsync = _freedayService.GetAllAsync();
+        var transportcompanyAsync = _transportcompanyService.GetAllAsync();
+        var countryAsync = _countryService.GetAllAsync();
+
+        lst.Add(transportcompanyAsync);
+        lst.Add(countryAsync);
+
+        await Task.WhenAll(lst);
+
+        transportcompanyList = await transportcompanyAsync;
+        countryList = await countryAsync;
+        freedaysList = await freedaysAsync;
+
+        freedaysGrid = (from f in freedaysList
+                        join t in transportcompanyList on f.TransportCompanyId equals t.TransportCompanyId
+                        join c in countryList on f.CountryId equals c.CountryId
+                        select new FreeDaysGrid()
+            {
+                Id = f.Id,
+                TransportCompany = t.TransportCompany,
+                Country = c.Country,
+                FreeDays = f.FreeDays
+            }).ToList();
+
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await localStorage.SetItemAsync<string>("last", "freedays");
+            isLoading = true;
+
+            await FillData();
+
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenDialog(int id)
+    {
+        var s = await _freedayService.GetAsync(id);
+
+        var parameters = new DialogParameters<FreeDaysForm> { { x => x.freeday, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<FreeDaysForm>("Free Days", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await FillData();
+        }
+    }
+
+    private async void OnDelete(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete",
+            "Confirm to delete item?",
+            yesText: "Delete", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+
+                    var x = await _freedayService.DeleteAsync(id);
+
+                    await FillData();
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Snackbar.Add("No se pudo eliminar el registro. Intenta nuevamente.", Severity.Error);
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private Func<FreeDaysGrid, object> _sortBy => x =>
+    {
+        if (_sortNameByLength)
+            return x.FreeDays.ToString().Length;
+        else
+            return x.FreeDays;
+    };
+
+    private Func<FreeDaysGrid, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.FreeDays.ToString().Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+}

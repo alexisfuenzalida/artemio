@@ -1,0 +1,143 @@
+﻿@page "/tta"
+
+@using ArtemioBlazorWA.Forms;
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject TtaService _ttaService
+@inject IDialogService DialogService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject ISnackbar Snackbar
+
+<EntityGridPage T="TtaModel"
+                 Title="Tta"
+                 Items="@ttaList"
+                 IsLoading="@isLoading"
+                 @bind-SearchString="_searchString"
+                 QuickFilter="@_quickFilter"
+                 CreateLabel="Create"
+                 OnCreate="@(() => OpenDialog(new TtaModel()))"
+                 EmptyMessage="No hay resultados.">
+    <Columns>
+        <PropertyColumn Property="x => x.Id" Title="Id" />
+        <PropertyColumn Property="x => x.Container" Title="Container" />
+        <PropertyColumn Property="x => x.Sello" Title="Sello" />
+        <PropertyColumn Property="x => x.Conductor" Title="Conductor" />
+        <PropertyColumn Property="x => x.FechaCarga.Value.ToShortDateString()" Title="Fecha Carga" />
+        <PropertyColumn Property="x => x.Packing" Title="Packing" />
+        <TemplateColumn CellClass="d-flex justify-center" Sortable="false" Filterable="false">
+            <CellTemplate>
+                <MudStack Row>
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                        <MudMenuItem OnClick="@(() => OpenDialog(context.Item))" Icon="@Icons.Material.Filled.Edit" IconSize="Size.Small">Edit</MudMenuItem>
+                        <MudMenuItem OnClick="@(() => OnDelete(context.Item.Id))" Icon="@Icons.Material.Filled.Delete" IconSize="Size.Small">Delete</MudMenuItem>
+                    </MudMenu>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+</EntityGridPage>
+
+
+@code {
+    List<TtaModel> ttaList = new();
+    private TtaModel data = new();
+    private string _searchString;
+    private bool _sortNameByLength;
+    bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await localStorage.SetItemAsync<string>("last", "tta");
+            isLoading = true;
+            ttaList = await _ttaService.GetAllAsync();
+
+            if (ttaList == null)
+            {
+                ttaList = new List<TtaModel>();
+            }
+
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenDialog(TtaModel s)
+    {
+        var parameters = new DialogParameters<TtaForm> { { x => x.tta, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Large, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<TtaForm>("tta", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            ttaList = await _ttaService.GetAllAsync();
+        }
+    }
+
+    private async void OnDelete(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete",
+            "Confirm to delete item?",
+            yesText: "Delete", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+
+                    var x = await _ttaService.DeleteAsync(id);
+                    ttaList = await _ttaService.GetAllAsync();
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Snackbar.Add("No se pudo eliminar el registro. Intenta nuevamente.", Severity.Error);
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private Func<TtaModel, object> _sortBy => x =>
+    {
+        if (_sortNameByLength)
+            return x.Conductor.Length;
+        else
+            return x.Conductor;
+    };
+
+    private Func<TtaModel, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.Container.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Sello.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Conductor.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.FechaCarga.Value.ToShortDateString().Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Packing.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+}

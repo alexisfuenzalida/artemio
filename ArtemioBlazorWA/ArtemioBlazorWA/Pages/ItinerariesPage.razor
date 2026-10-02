@@ -1,0 +1,275 @@
+﻿@page "/itineraries"
+
+@using ArtemioBlazorWA.Forms;
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject ItineraryService _itineraryService
+@inject ServiceService _serviceService
+@inject TransportCompanyService _transportcompanyService
+@inject VesselService _vesselService
+@inject PortService _portService
+@inject FilterService _filterService
+
+@inject IDialogService DialogService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+@inject ISnackbar Snackbar
+
+<EntityGridPage T="ItineraryGrid"
+                 Title="Itinerary"
+                 Items="@itineraryList"
+                 IsLoading="@isLoading"
+                 @bind-SearchString="_searchString"
+                 QuickFilter="@_quickFilter"
+                 CreateLabel="Create"
+                 OnCreate="@(() => OpenDialog(0))"
+                 EmptyMessage="No hay itinerarios.">
+    <HeaderActions>
+        <MudButton Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.UploadFile"
+                   Color="Color.Primary"
+                   Size="Size.Medium"
+                   OnClick="@(() => OpenImportDialog())">
+            Import Excel
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.FileDownload"
+                   Color="Color.Primary"
+                   Size="Size.Medium"
+                   OnClick="@(() => OpenFilterDialog())">
+            Download
+        </MudButton>
+    </HeaderActions>
+    <Columns>
+        <PropertyColumn Property="x => x.Week" Filterable="false" />
+        <PropertyColumn Property="x => x.ETD!.Value.ToShortDateString()" Title="ETD" Filterable="false" />
+        <PropertyColumn Property="x => x.TransportCompany" Title="ShippingCompany" Filterable="false" />
+        <PropertyColumn Property="x => x.Service" Filterable="false" />
+        <PropertyColumn Property="x => x.Vessel" Filterable="false" />
+        <PropertyColumn Property="x => x.POL" Filterable="false" />
+        <TemplateColumn CellClass="d-flex justify-center" Sortable="false" Filterable="false">
+            <CellTemplate>
+                <MudStack Row>
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                        <MudMenuItem OnClick="@(() => OpenDialog(context.Item.ItineraryId))" Icon="@Icons.Material.Filled.Edit" IconSize="Size.Small">Edit</MudMenuItem>
+                        <MudMenuItem OnClick="@(() => OnDuplicate(context.Item.ItineraryId))" Icon="@Icons.Material.Filled.CopyAll" IconSize="Size.Small">Duplicate</MudMenuItem>
+                        <MudMenuItem OnClick="@(() => OnDelete(context.Item.ItineraryId))" Icon="@Icons.Material.Filled.Delete" IconSize="Size.Small">Delete</MudMenuItem>
+                    </MudMenu>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+</EntityGridPage>
+
+
+@code {
+    List<ItineraryGrid> itineraryList = new();
+
+    private List<TransportCompanyModel> transportcompanyList = new();
+    private List<VesselModel> vesselList = new();
+    private List<ItineraryModel> itinerary = new();
+    private List<PortModel> polList = new();
+    private List<ServiceModel> serviceList = new();
+
+    private string Email = "";
+
+    private int seasonId = 0;
+
+    private string _searchString;
+    private bool _sortNameByLength;
+    bool isLoading = true;
+    List<ItineraryGrid> selectedItinerary = new();
+
+    async Task FillData()
+    {
+        /*
+        var lst = new List<Task>();
+
+        var itineraryAsync = _itineraryService.GetAllAsync();
+        var transportcompanyAsync = _transportcompanyService.GetAllAsync();
+        var vesselAsync = _vesselService.GetAllAsync();
+        var polAsync = _portService.GetAllAsync();
+        var serviceAsync = _serviceService.GetAllAsync();
+
+        lst.Add(transportcompanyAsync);
+        lst.Add(vesselAsync);
+        lst.Add(itineraryAsync);
+        lst.Add(polAsync);
+        lst.Add(serviceAsync);
+
+        await Task.WhenAll(lst);
+
+        transportcompanyList = await transportcompanyAsync;
+        vesselList = await vesselAsync;
+        itinerary = await itineraryAsync;
+        polList = await polAsync;
+        serviceList = await serviceAsync;
+
+        itineraryList = (from i in itinerary
+                         join v in vesselList on i.VesselId equals v.VesselId
+                         //join t in transportcompanyList on i.TransportCompanyId equals t.TransportCompanyId
+                         join s in serviceList on i.ServiceId equals s.ServiceId
+                         join p in polList on i.POLId equals p.PortId
+                         select new ItineraryGrid()
+                             {
+                                 ItineraryId = i.ItineraryId,
+                                 Week = i.Week,
+                                 ETD = i.ETD,
+                                 TransportCompany = "",//t.TransportCompany,
+                                 Service = s.Service,
+                                 Vessel = v.Vessel,
+                                 POL = p.Port
+                             }
+        ).ToList();
+        */
+
+        itineraryList = await _itineraryService.GetAllAsync();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await localStorage.SetItemAsync<string>("last", "itineraries");
+            isLoading = true;
+            seasonId = await localStorage.GetItemAsync<int>("season");
+
+            await FillData();
+
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenFilterDialog()
+    {
+        var parameters = new DialogParameters<ItineraryFilterForm>();
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<ItineraryFilterForm>("Filter Contract", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            isLoading = true;
+
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenImportDialog()
+    {
+        var parameters = new DialogParameters<ItineraryImportForm>();
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<ItineraryImportForm>("Import Itineraries", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            isLoading = true;
+
+            await FillData();
+
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenDialog(int id)
+    {
+        var parameters = new DialogParameters<ItineraryForm> { { x => x.id, id } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.ExtraExtraLarge, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<ItineraryForm>("itinerary", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            isLoading = true;
+
+            await FillData();
+
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async void OnDelete(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete",
+            "Confirm to delete item?",
+            yesText: "Delete", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            var x = await _itineraryService.DeleteAsync(id);
+            //itineraryList = await _itineraryService.GetAllAsync();
+            isLoading = true;
+
+            await FillData();
+
+            isLoading = false;
+            StateHasChanged();
+        }
+
+        StateHasChanged();
+    }
+
+    private async void OnDuplicate(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Duplicate",
+            "Confirm to duplicate itinerary?",
+            yesText: "Duplicate", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            isLoading = true;
+            var x = await _itineraryService.PostCopyAsync(id, 7);
+
+            Show("Duplicate Success", Severity.Info);
+
+            await FillData();
+
+            isLoading = false;
+        }
+
+        StateHasChanged();
+    }
+
+    private Func<ItineraryGrid, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.Week.ToString().Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.ETD.Value.ToShortDateString().Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.TransportCompany.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Service.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Vessel.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.POL.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+
+    private Snackbar _snackbar;
+
+    void Show(string msg, Severity severity)
+    {
+        Snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomCenter;
+        _snackbar = Snackbar.Add(msg, severity);
+    }
+}

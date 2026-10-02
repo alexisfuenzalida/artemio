@@ -1,0 +1,350 @@
+﻿@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject TransportCompanyService _transportcompanyService
+@inject ServiceService _serviceService
+@inject TransportCompanyServiceService _transportcompanyserviceService
+@inject PortService _portService
+@inject TransportCompanyPolService _transportcompanypolService
+@inject TransportCompanyPodService _transportcompanypodService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            ShippingCompany
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <FormSkeleton Rows="8" Columns="4" />
+        }
+        else
+        {
+<MudForm @ref="form">
+
+        <MudGrid>
+            <MudItem xs="12">
+                <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                    @if (transportcompany.TransportCompanyId > 0)
+                    {
+                        <MudItem xs="9">
+                            <MudTextField Variant="Variant.Outlined" T="string" @bind-Value="transportcompany.TransportCompany" Label="ShippingCompany" Required="true" RequiredError="TransportCompany is required!" />
+                        </MudItem>
+                        <MudItem xs="3">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Info" Size="Size.Medium" OnClick="@(() => OpenDialog(transportcompany))">
+                                Manage Items
+                            </MudButton>
+                        </MudItem>
+                    }
+                    else
+                    {
+                        <MudItem xs="12">
+                            <MudTextField Variant="Variant.Outlined" T="string" @bind-Value="transportcompany.TransportCompany" Label="ShippingCompany" Required="true" RequiredError="TransportCompany is required!" />
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudItem>
+            <MudItem xs="12">
+                <MudGrid Justify="Justify.Center" Style="align-items: start;">
+                    <MudItem xs="6">
+                        <MudAlert Severity="Severity.Info">Service Available</MudAlert>
+                        <MudTextField T="string" @bind-Value="serviceFilter" Placeholder="Buscar..." Variant="Variant.Text"
+                                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Small"
+                                      Immediate="true" Class="mt-0" />
+                        <MudList T="ServiceModel" Style="max-height: 400px; overflow-y: auto;">
+                            @foreach(var item in available.Where(x => string.IsNullOrWhiteSpace(serviceFilter) || x.Service.Contains(serviceFilter, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                <MudListItem Text="@item.Service" OnClick="@(() => AddItem(item))" />
+                            }
+                        </MudList>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudAlert Severity="Severity.Info">Service Assigned</MudAlert>
+                        <MudList T="ServiceModel" Style="max-height: 400px; overflow-y: auto;">
+                            @foreach (var item in assigned)
+                            {
+                                <MudListItem Text="@item.Service" OnClick="@(() => RemoveItem(item))" />
+                            }
+                        </MudList>
+                    </MudItem>
+                </MudGrid>
+            </MudItem>
+            <MudItem xs="12">
+                <MudGrid Justify="Justify.Center" Style="align-items: start;">
+                    <MudItem xs="6">
+                        <MudAlert Severity="Severity.Info">POL Available</MudAlert>
+                        <MudTextField T="string" @bind-Value="polFilter" Placeholder="Buscar..." Variant="Variant.Text"
+                                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Small"
+                                      Immediate="true" Class="mt-0" />
+                        <MudList T="PortModel" Style="max-height: 400px; overflow-y: auto;">
+                            @foreach (var item in polAvailable.Where(x => string.IsNullOrWhiteSpace(polFilter) || x.Port.Contains(polFilter, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                <MudListItem Text="@item.Port" OnClick="@(() => AddPolItem(item))" />
+                            }
+                        </MudList>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudAlert Severity="Severity.Info">POL Assigned</MudAlert>
+                        <MudList T="PortModel" Style="max-height: 400px; overflow-y: auto;">
+                            @foreach (var item in polAssigned)
+                            {
+                                <MudListItem Text="@item.Port" OnClick="@(() => RemovePolItem(item))" />
+                            }
+                        </MudList>
+                    </MudItem>
+                </MudGrid>
+            </MudItem>
+            <MudItem xs="12">
+                <MudGrid Justify="Justify.Center" Style="align-items: start;">
+                    <MudItem xs="6">
+                        <MudAlert Severity="Severity.Info">POD Available</MudAlert>
+                        <MudTextField T="string" @bind-Value="podFilter" Placeholder="Buscar..." Variant="Variant.Text"
+                                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Small"
+                                      Immediate="true" Class="mt-0" />
+                        <MudList T="PortModel" Style="max-height: 400px; overflow-y: auto;">
+                            @foreach (var item in podAvailable.Where(x => string.IsNullOrWhiteSpace(podFilter) || x.Port.Contains(podFilter, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                <MudListItem Text="@item.Port" OnClick="@(() => AddPodItem(item))" />
+                            }
+                        </MudList>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudAlert Severity="Severity.Info">POD Assigned</MudAlert>
+                        <MudList T="PortModel" Style="max-height: 400px; overflow-y: auto;">
+                            @foreach (var item in podAssigned)
+                            {
+                                <MudListItem Text="@item.Port" OnClick="@(() => RemovePodItem(item))" />
+                            }
+                        </MudList>
+                    </MudItem>
+                </MudGrid>
+            </MudItem>
+        </MudGrid>
+
+            </MudForm>
+            }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Disabled="@_processing" OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary">
+            @if (_processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Processing</MudText>
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public TransportCompanyModel transportcompany { get; set; } = new TransportCompanyModel();
+
+    private ServiceModel service = new();
+    private List<ServiceModel> serviceList = new();
+    private List<ServiceModel> available = new();
+    private List<ServiceModel> assigned = new();
+    private string serviceFilter = "";
+
+    private List<PortModel> portList = new();
+    private List<PortModel> polAvailable = new();
+    private List<PortModel> polAssigned = new();
+    private List<PortModel> podAvailable = new();
+    private List<PortModel> podAssigned = new();
+    private string polFilter = "";
+    private string podFilter = "";
+
+    private bool _processing = false;
+    private MudForm? form;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            serviceList = await _serviceService.GetAllAsync();
+
+            if (serviceList == null)
+            {
+                serviceList = new List<ServiceModel>();
+            }
+
+            assigned = await _transportcompanyserviceService.GetAllAssignedAsync(transportcompany.TransportCompanyId);
+
+            if (assigned == null)
+            {
+                assigned = new List<ServiceModel>();
+
+                available = serviceList;
+            }
+            else
+            {
+                available = await _transportcompanyserviceService.GetAllAvailableAsync(transportcompany.TransportCompanyId);
+            }
+
+            portList = await _portService.GetAllAsync();
+
+            if (portList == null)
+            {
+                portList = new List<PortModel>();
+            }
+
+            polAssigned = await _transportcompanypolService.GetAllAssignedAsync(transportcompany.TransportCompanyId);
+
+            if (polAssigned == null)
+            {
+                polAssigned = new List<PortModel>();
+
+                polAvailable = portList;
+            }
+            else
+            {
+                polAvailable = await _transportcompanypolService.GetAllAvailableAsync(transportcompany.TransportCompanyId);
+            }
+
+            podAssigned = await _transportcompanypodService.GetAllAssignedAsync(transportcompany.TransportCompanyId);
+
+            if (podAssigned == null)
+            {
+                podAssigned = new List<PortModel>();
+
+                podAvailable = portList;
+            }
+            else
+            {
+                podAvailable = await _transportcompanypodService.GetAllAvailableAsync(transportcompany.TransportCompanyId);
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+        isLoading = false;
+    }
+
+    private async Task Submit()
+    {
+
+        if (form is not null)
+        {
+            await form.Validate();
+            if (!form.IsValid)
+            {
+                return;
+            }
+        }
+        var x = new TransportCompanyModel();
+
+        _processing = true;
+
+        if (transportcompany.TransportCompanyId == 0)
+        {
+            x = await _transportcompanyService.PostAsync(transportcompany);
+        }
+        else
+        {
+            x = await _transportcompanyService.PutAsync(transportcompany);
+        }
+
+        await _transportcompanyserviceService.DeleteAsync(x.TransportCompanyId);
+
+        foreach(var item in assigned)
+        {
+            var ts = new TransportCompanyServiceModel()
+                {
+                    TransportCompanyId = x.TransportCompanyId,
+                    ServiceId = item.ServiceId
+                };
+
+            var s = await _transportcompanyserviceService.PostAsync(ts);
+        }
+
+        await _transportcompanypolService.DeleteAsync(x.TransportCompanyId);
+
+        foreach (var item in polAssigned)
+        {
+            var tp = new TransportCompanyPolModel()
+                {
+                    TransportCompanyId = x.TransportCompanyId,
+                    PortId = item.PortId
+                };
+
+            var s = await _transportcompanypolService.PostAsync(tp);
+        }
+
+        await _transportcompanypodService.DeleteAsync(x.TransportCompanyId);
+
+        foreach (var item in podAssigned)
+        {
+            var tp = new TransportCompanyPodModel()
+                {
+                    TransportCompanyId = x.TransportCompanyId,
+                    PortId = item.PortId
+                };
+
+            var s = await _transportcompanypodService.PostAsync(tp);
+        }
+
+        _processing = false;
+        if (x == null)
+        {
+            Snackbar.Add("Could not save. Please try again.", Severity.Error);
+            return;
+        }
+        MudDialog.Close(true);
+    }
+
+    void Cancel() => MudDialog.Cancel();
+
+    void AddItem(ServiceModel service)
+    {
+        available.Remove(service);
+        assigned.Add(service);
+    }
+    void RemoveItem(ServiceModel service)
+    {
+        assigned.Remove(service);
+        available.Add(service);
+    }
+
+    void AddPolItem(PortModel port)
+    {
+        polAvailable.Remove(port);
+        polAssigned.Add(port);
+    }
+    void RemovePolItem(PortModel port)
+    {
+        polAssigned.Remove(port);
+        polAvailable.Add(port);
+    }
+
+    void AddPodItem(PortModel port)
+    {
+        podAvailable.Remove(port);
+        podAssigned.Add(port);
+    }
+    void RemovePodItem(PortModel port)
+    {
+        podAssigned.Remove(port);
+        podAvailable.Add(port);
+    }
+
+    private async Task OpenDialog(TransportCompanyModel tc)
+    {
+        var parameters = new DialogParameters<TransportCompanyItemForm> { { x => x.tc, tc }};
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Large, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<TransportCompanyItemForm>("Items", parameters, options);
+    }
+}

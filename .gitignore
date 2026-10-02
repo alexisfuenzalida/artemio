@@ -1,0 +1,60 @@
+# Compilación .NET (dotnet build / dotnet publish)
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+artifacts/
+.publish/
+publish/
+*.dll
+*.exe
+*.pdb
+*.deps.json
+*.runtimeconfig.json
+*.staticwebassets.endpoints.json
+*.staticwebassets.runtime.json
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+
+# Dependencias de Node (npm install)
+node_modules/
+
+# Caché e IDE
+.vs/
+.idea/
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+# Pruebas, cobertura y logs generados
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+coverage*/
+*.coverage
+*.coveragexml
+[Ll]og/
+[Ll]ogs/
+*.log
+*.binlog
+*.bak
+*~
+~$*
+
+# Ajustes locales del agente
+.claude/
+
+# Secretos locales. Usar los archivos de ejemplo.
+.env
+.env.*
+!.env.example
+MinimalAPIArtemio/**/appsettings.json
+MinimalAPIArtemio/**/appsettings.*.json
+!MinimalAPIArtemio/**/*.example.json

@@ -1,0 +1,220 @@
+﻿@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+@using ArtemioBlazorWA.Forms;
+
+@inject ShipperService _shipperService
+@inject ShipperContactService _shipperContactService
+@inject CityService _cityService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            Shipper
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <FormSkeleton Rows="8" Columns="4" />
+        }
+        else
+        {
+<MudForm @ref="form">
+
+        <MudGrid>
+            <MudItem xs="12">
+                <MudTextField T="string" @bind-Value="shipper.Code" Label="Code" Required="true" RequiredError="Code is required!" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField T="string" @bind-Value="shipper.Shipper" Label="Shipper" Required="true" RequiredError="Shipper is required!" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField T="string" @bind-Value="shipper.Rut" Label="Rut" Required="true" RequiredError="Rut is required!" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField T="string" @bind-Value="shipper.Address" Label="Address" Required="true" RequiredError="Address is required!" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                    <MudItem xs="9">
+                        <MudSelect Variant="Variant.Outlined" T="int" Label="City" @bind-Value="shipper.CityId" Required="true" RequiredError="City is required!"
+                                   ToStringFunc="@(id => cityList.FirstOrDefault(c => c.CityId == id)?.City)">
+                            @foreach (CityModel item in cityList)
+                            {
+                                <MudSelectItem T="int" Value="@item.CityId">@item.City</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="3">
+                        <MudFab StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => OpenDialog(city))" />
+                    </MudItem>
+                </MudGrid>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudTextField T="string" @bind-Value="shipper.Comment" Label="Comment" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudCheckBox @bind-Checked="@shipper.Enabled" T="bool">Enabled</MudCheckBox>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudButton Variant="Variant.Filled"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           Color="Color.Info"
+                           OnClick="@(() => AddRow(contact))">
+                    Add Row
+                </MudButton>
+            </MudItem>
+
+            <MudItem xs="12">
+                @foreach(var item in listContacts)
+                {
+                    <MudGrid>
+                        <MudItem xs="3">
+                            <MudTextField T="string" @bind-Value="item.Contact" Label="Contact" />
+                        </MudItem>
+                        <MudItem xs="3">
+                            <MudTextField T="string" @bind-Value="item.Phone" Label="Phone" />
+                        </MudItem>
+                        <MudItem xs="3">
+                            <MudTextField T="string" @bind-Value="@item.Email" Label="Email" />
+                        </MudItem>
+                        <MudItem xs="3">
+                            <MudIconButton Color="Color.Error" Icon="@Icons.Material.Filled.Delete" aria-label="delete" OnClick="@(() => DeleteRow(item))"></MudIconButton>
+                        </MudItem>
+                    </MudGrid>
+                }
+            </MudItem>
+        </MudGrid>
+            </MudForm>
+            }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Disabled="@_processing" OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary">
+            @if (_processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Processing</MudText>
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public ShipperModel shipper { get; set; } = new ShipperModel();
+
+    private CityModel city = new();
+    private List<CityModel> cityList = new();
+
+    private ShipperContactModel contact = new();
+    private List<ShipperContactModel> listContacts = new();
+
+    private bool _processing = false;
+    private MudForm? form;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            cityList = await _cityService.GetAllAsync();
+
+            if (cityList == null)
+            {
+                cityList = new List<CityModel>();
+            }
+
+            if (shipper.ShipperId != 0)
+            {
+                listContacts = await _shipperContactService.GetAsync(shipper.ShipperId);
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+        isLoading = false;
+    }
+
+
+    private async Task Submit()
+    {
+
+        if (form is not null)
+        {
+            await form.Validate();
+            if (!form.IsValid)
+            {
+                return;
+            }
+        }
+        var x = new ShipperModel();
+
+        _processing = true;
+
+        if (shipper.ShipperId == 0)
+        {
+            x = await _shipperService.PostAsync(shipper);
+        }
+        else
+        {
+            x = await _shipperService.PutAsync(shipper);
+        }
+
+        await _shipperContactService.DeleteAsync(shipper.ShipperId);
+
+        foreach(var item in listContacts)
+        {
+            item.ShipperId = shipper.ShipperId;
+
+            await _shipperContactService.PostAsync(item);
+        }
+
+        _processing = false;
+        if (x == null)
+        {
+            Snackbar.Add("Could not save. Please try again.", Severity.Error);
+            return;
+        }
+        MudDialog.Close(true);
+    }
+
+    void Cancel() => MudDialog.Cancel();
+
+    private async Task OpenDialog(CityModel s)
+    {
+        var parameters = new DialogParameters<CityForm> { { x => x.city, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<CityForm>("city", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            cityList = await _cityService.GetAllAsync();
+        }
+    }
+
+    private void AddRow(ShipperContactModel c)
+    {
+        listContacts.Add(c);
+    }
+
+    private void DeleteRow(ShipperContactModel item)
+    {
+        listContacts = listContacts.Where(c => c != item).ToList();
+    }
+}

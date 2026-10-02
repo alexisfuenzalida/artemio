@@ -1,0 +1,65 @@
+namespace MinimalAPIArtemio.Endpoints;
+
+public static class EndpointRouteBuilderExtensions
+{
+    public static void MapArtemioEndpoints(this IEndpointRouteBuilder app)
+    {
+        app.MapAuthEndpoints();
+        app.MapUserEndpoints();
+        app.MapHealthEndpoints();
+        app.MapPreInvoiceEndpoints();
+        app.MapBookingSendDaysEndpoints();
+        app.MapAgentEndpoints();
+        app.MapAgentAduanaEndpoints();
+        app.MapAgentEmbarqueEndpoints();
+        app.MapBlIssuedEndpoints();
+        app.MapCityEndpoints();
+        app.MapCommodityEndpoints();
+        app.MapConsigneeEndpoints();
+        app.MapContainerTypeEndpoints();
+        app.MapCostItemEndpoints();
+        app.MapContractTypeEndpoints();
+        app.MapCountryEndpoints();
+        app.MapFreeDaysEndpoints();
+        app.MapIncidenceTypeEndpoints();
+        app.MapIncotermEndpoints();
+        app.MapIntermediaryEndpoints();
+        app.MapInvoiceEndpoints();
+        app.MapInvoiceDetailEndpoints();
+        app.MapInvolvedEndpoints();
+        app.MapItineraryEndpoints();
+        app.MapItineraryDetailEndpoints();
+        app.MapItineraryEtdEndpoints();
+        app.MapItineraryTransportCompanyEndpoints();
+        app.MapItineraryImportEndpoints();
+        app.MapNotifyEndpoints();
+        app.MapPaymentConditionEndpoints();
+        app.MapPaymentEndpoints();
+        app.MapPaymentDetailEndpoints();
+        app.MapPortEndpoints();
+        app.MapSeasonEndpoints();
+        app.MapServiceEndpoints();
+        app.MapShipperEndpoints();
+        app.MapStackingEndpoints();
+        app.MapStatusContainerEndpoints();
+        app.MapTransportEndpoints();
+        app.MapTransportCompanyEndpoints();
+        app.MapTtaEndpoints();
+        app.MapTtEndpoints();
+        app.MapTtDetailEndpoints();
+        app.MapVesselEndpoints();
+        app.MapWarehouseEndpoints();
+        app.MapBookingEndpoints();
+        app.MapBookingDetailEndpoints();
+        app.MapBookingIncidenceEndpoints();
+        app.MapBookingEtaEndpoints();
+        app.MapBookingPodEndpoints();
+        app.MapSendBookingEndpoints();
+        app.MapBookingStackingEndpoints();
+        app.MapContractEndpoints();
+        app.MapContractDetailEndpoints();
+        app.MapContractConditionEndpoints();
+        app.MapDashboardEndpoints();
+        app.MapReportEndpoints();
+    }
+}

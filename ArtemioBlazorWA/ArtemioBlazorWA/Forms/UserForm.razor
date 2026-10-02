@@ -1,0 +1,103 @@
+﻿@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+@using ArtemioBlazorWA.Forms;
+
+@inject UserService _userService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            User
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <FormSkeleton Rows="3" />
+        }
+        else
+        {
+<MudForm @ref="form">
+
+        <MudGrid>
+            <MudItem xs="12">
+                <MudTextField Variant="Variant.Outlined" T="string" @bind-Value="user.User" Label="User" Required="true" RequiredError="User is required!" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField Variant="Variant.Outlined" T="string" @bind-Value="user.Password" Label="Password" InputType="InputType.Password" Required="true" RequiredError="Password is required!" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField Variant="Variant.Outlined" T="string" @bind-Value="user.Email" Label="Email" Required="true" RequiredError="Email is required!" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField Variant="Variant.Outlined" T="string" @bind-Value="user.Type" Label="Type" Required="true" RequiredError="Type is required!" />
+            </MudItem>
+        </MudGrid>
+            </MudForm>
+            }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Disabled="@_processing" OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary">
+            @if (_processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Processing</MudText>
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public UserModel user { get; set; } = new UserModel();
+
+    private CountryModel country = new();
+    private List<CountryModel> countryList = new();
+
+    private bool _processing = false;
+    private MudForm? form;
+    private bool isLoading = false;
+
+
+    private async Task Submit()
+    {
+
+        if (form is not null)
+        {
+            await form.Validate();
+            if (!form.IsValid)
+            {
+                return;
+            }
+        }
+        var x = new UserModel();
+
+        _processing = true;
+
+        if (user.UserId == 0)
+        {
+            x = await _userService.PostAsync(user);
+        }
+        else
+        {
+            x = await _userService.PutAsync(user);
+        }
+
+        _processing = false;
+        if (x == null)
+        {
+            Snackbar.Add("Could not save. Please try again.", Severity.Error);
+            return;
+        }
+        MudDialog.Close(true);
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}

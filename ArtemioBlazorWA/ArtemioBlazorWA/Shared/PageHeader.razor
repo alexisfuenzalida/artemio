@@ -1,0 +1,11 @@
+<MudPaper Class="d-flex align-center flex-grow-1 gap-4 pa-6 my-6" Elevation="1">
+    @SearchContent
+    <MudSpacer />
+    @ChildContent
+</MudPaper>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public RenderFragment? SearchContent { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

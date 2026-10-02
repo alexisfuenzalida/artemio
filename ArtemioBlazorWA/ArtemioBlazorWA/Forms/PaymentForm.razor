@@ -1,0 +1,306 @@
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject ISnackbar Snackbar
+@inject PaymentService _paymentService
+@inject PaymentDetailService _paymentDetailService
+@inject InvoiceService _invoiceService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            Payment
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <FormSkeleton Rows="4" Columns="2" />
+        }
+        else
+        {
+<MudForm @ref="form">
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="4">
+                    <MudDatePicker Margin="margin" Variant="Variant.Outlined" Editable="true" Label="Date" @bind-Date="payment.Date" DateFormat="@dateFormat" Clearable="true" Required="true" RequiredError="Date is required!" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4">
+                    <MudNumericField Margin="margin" Variant="Variant.Outlined" T="decimal" Label="Amount" @bind-Value="payment.Amount" Format="N2" HideSpinButtons="true" ReadOnly="true" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudCard Elevation="2">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.body1">Invoices</MudText>
+                            </CardHeaderContent>
+                            <CardHeaderActions>
+                                <MudButton Variant="Variant.Filled"
+                                           StartIcon="@Icons.Material.Filled.Add"
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           OnClick="AddRow">
+                                    Add Invoice
+                                </MudButton>
+                            </CardHeaderActions>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudTable Items="@listDetails" Hover="true" Breakpoint="Breakpoint.None" Dense="true">
+                                <HeaderContent>
+                                    <MudTh>Invoice</MudTh>
+                                    <MudTh>Amount</MudTh>
+                                    <MudTh></MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="Invoice">
+                                        <MudAutocomplete T="InvoiceBalanceModel"
+                                                         Margin="margin"
+                                                         Variant="Variant.Outlined"
+                                                         Value="@(availableInvoices.FirstOrDefault(c => c.InvoiceId == context.InvoiceId) ?? ToInvoiceBalance(context))"
+                                                         ValueChanged="@(newValue => InvoiceChanged(newValue, context))"
+                                                         SearchFunc="@(async (value, token) => await SearchInvoice(value, context))"
+                                                         ToStringFunc="@(c => c == null ? null : $"{c.Number} (Balance: {c.Balance:N2})")"
+                                                         Label="Invoice"
+                                                         ResetValueOnEmptyText="true"
+                                                         CoerceText="false"
+                                                         CoerceValue="false"
+                                                         Clearable="true" />
+                                    </MudTd>
+                                    <MudTd DataLabel="Amount">
+                                        <MudNumericField Margin="margin"
+                                                         Variant="Variant.Outlined"
+                                                         T="decimal"
+                                                         Value="context.Amount"
+                                                         ValueChanged="@(v => AmountChanged(context, v))"
+                                                         HideSpinButtons="true"
+                                                         Format="N2"
+                                                         Immediate="true" />
+                                    </MudTd>
+                                    <MudTd DataLabel="Remove">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                       Color="Color.Error"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => RemoveRow(context))" />
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Disabled="@_processing" OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary">
+            @if (_processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Processing</MudText>
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public PaymentModel payment { get; set; } = new PaymentModel();
+
+    private List<PaymentDetailModel> listDetails = new();
+    private List<InvoiceBalanceModel> availableInvoices = new();
+    private bool _processing = false;
+    private MudForm? form;
+    private bool isLoading = true;
+    private Margin margin = Margin.Dense;
+    private string dateFormat = "dd/MM/yyyy";
+    private int seasonId = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            seasonId = await localStorage.GetItemAsync<int>("season");
+
+            if (payment.PaymentId != 0)
+            {
+                payment = await _paymentService.GetAsync(payment.PaymentId) ?? payment;
+                listDetails = await _paymentDetailService.GetAsync(payment.PaymentId) ?? new List<PaymentDetailModel>();
+            }
+
+            if (payment.Date == null)
+            {
+                payment.Date = DateTime.Today;
+            }
+
+            await LoadAvailableInvoices();
+            RecalcAmount();
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+            await Task.Delay(500);
+        }
+        isLoading = false;
+    }
+
+    private async Task LoadAvailableInvoices()
+    {
+        if (seasonId == 0)
+        {
+            availableInvoices = new List<InvoiceBalanceModel>();
+            return;
+        }
+
+        availableInvoices = await _invoiceService.GetBySeasonAsync(seasonId, payment.PaymentId)
+            ?? new List<InvoiceBalanceModel>();
+    }
+
+    private void AddRow()
+    {
+        listDetails.Add(new PaymentDetailModel());
+        StateHasChanged();
+    }
+
+    private void RemoveRow(PaymentDetailModel row)
+    {
+        listDetails.Remove(row);
+        RecalcAmount();
+        StateHasChanged();
+    }
+
+    private InvoiceBalanceModel? ToInvoiceBalance(PaymentDetailModel row)
+    {
+        if (row.InvoiceId == 0)
+        {
+            return null;
+        }
+
+        return new InvoiceBalanceModel
+        {
+            InvoiceId = row.InvoiceId,
+            Number = row.InvoiceNumber,
+            Amount = row.Amount,
+        };
+    }
+
+    private Task<IEnumerable<InvoiceBalanceModel>> SearchInvoice(string value, PaymentDetailModel row)
+    {
+        var used = listDetails.Where(d => d != row && d.InvoiceId != 0).Select(d => d.InvoiceId).ToHashSet();
+        IEnumerable<InvoiceBalanceModel> source = availableInvoices.Where(p => !used.Contains(p.InvoiceId));
+
+        if (row.InvoiceId != 0 && source.All(p => p.InvoiceId != row.InvoiceId))
+        {
+            source = source.Append(ToInvoiceBalance(row)!);
+        }
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Task.FromResult(source);
+        }
+
+        return Task.FromResult(source.Where(x =>
+            x.Number.Contains(value, StringComparison.InvariantCultureIgnoreCase)));
+    }
+
+    private void InvoiceChanged(InvoiceBalanceModel? selected, PaymentDetailModel row)
+    {
+        if (selected == null)
+        {
+            row.InvoiceId = 0;
+            row.InvoiceNumber = "";
+            row.Amount = 0;
+        }
+        else
+        {
+            row.InvoiceId = selected.InvoiceId;
+            row.InvoiceNumber = selected.Number;
+            row.Amount = selected.Balance;
+        }
+
+        RecalcAmount();
+        StateHasChanged();
+    }
+
+    private void AmountChanged(PaymentDetailModel row, decimal value)
+    {
+        row.Amount = value;
+        RecalcAmount();
+        StateHasChanged();
+    }
+
+    private void RecalcAmount()
+    {
+        payment.Amount = listDetails.Sum(x => x.Amount);
+    }
+
+    private async Task Submit()
+    {
+
+        if (form is not null)
+        {
+            await form.Validate();
+            if (!form.IsValid)
+            {
+                return;
+            }
+        }
+        if (payment.Date == null)
+        {
+            Show("Date is required!", Severity.Error);
+            return;
+        }
+
+        var details = listDetails.Where(x => x.InvoiceId != 0).ToList();
+        if (details.Count == 0)
+        {
+            Show("Add at least one invoice.", Severity.Error);
+            return;
+        }
+
+        RecalcAmount();
+
+        _processing = true;
+
+        PaymentModel saved;
+        if (payment.PaymentId == 0)
+        {
+            saved = await _paymentService.PostAsync(payment);
+        }
+        else
+        {
+            saved = await _paymentService.PutAsync(payment);
+        }
+
+        if (saved == null)
+        {
+            _processing = false;
+            Snackbar.Add("Could not save. Please try again.", Severity.Error);
+            return;
+        }
+
+        await _paymentDetailService.DeleteAsync(saved.PaymentId);
+
+        foreach (var item in details)
+        {
+            item.PaymentId = saved.PaymentId;
+            await _paymentDetailService.PostAsync(item);
+        }
+
+        _processing = false;
+        MudDialog.Close(true);
+    }
+
+    void Cancel() => MudDialog.Cancel();
+
+    private Snackbar? _snackbar;
+
+    void Show(string msg, Severity severity)
+    {
+        _snackbar = Snackbar.Add(msg, severity);
+    }
+}

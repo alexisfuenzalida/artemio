@@ -1,0 +1,19 @@
+{
+  "name": "mcp-artemio-db",
+  "version": "1.0.0",
+  "description": "Servidor MCP para conectar Claude a la base de datos de producción de Artemio Navieras (MySQL)",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "mcp-artemio-db": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.11.0",
+    "dotenv": "^16.4.5",
+    "mysql2": "^3.11.4",
+    "zod": "^3.23.8"
+  }
+}

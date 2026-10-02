@@ -1,0 +1,441 @@
+﻿@page "/booking"
+
+@using ArtemioBlazorWA.Forms;
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject BookingService _bookingService
+@inject AgentService _agentService
+@inject CommodityService _commodityService
+@inject ShipperService _shipperService
+@inject TransportCompanyService _transportcompanyService
+@inject VesselService _vesselService
+@inject PortService _portService
+@inject UserService _userService
+@inject IDialogService DialogService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+@inject ISnackbar Snackbar
+
+<EntityGridPage T="BookingGrid"
+                 Title="Booking"
+                 Items="@bookingList"
+                 IsLoading="@isLoading"
+                 @bind-SearchString="_searchString"
+                 QuickFilter="@_quickFilter"
+                 CreateLabel="Create"
+                 OnCreate="@(() => OpenDialog(0))"
+                 MultiSelection="true"
+                 SelectedItemsChanged="@SelectedItemsChanged"
+                 EmptyMessage="No hay bookings.">
+    <HeaderActions>
+        <MudButton Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.Update"
+                   Color="Color.Primary"
+                   Size="Size.Medium"
+                   OnClick="@(() => OpenDialogStacking(0))">
+            Check Stacking
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.EditNote"
+                   Color="Color.Primary"
+                   Size="Size.Medium"
+                   OnClick="@OpenDialogHsCode">
+            Edit HsCode
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.Send"
+                   Color="Color.Primary"
+                   Size="Size.Medium"
+                   Disabled="@(selectedBooking.Count == 0)"
+                   OnClick="@(() => OnSendMultiple())">
+            Send Email (@selectedBooking.Count)
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.Send"
+                   Color="Color.Primary"
+                   Size="Size.Medium"
+                   OnClick="@OpenDialogFreeDays">
+            Send Free Days
+        </MudButton>
+    </HeaderActions>
+    <Columns>
+        <SelectColumn T="BookingGrid" />
+        <PropertyColumn Property="x => x.ETDWeek" HeaderStyle="font-weight: bold;" />
+        <PropertyColumn Property="x => x.ETD!.Value.ToString(format)" Title="ETD" HeaderStyle="font-weight: bold;" />
+        <PropertyColumn Property="x => x.ETA!.Value.ToString(format)" Title="ETA" HeaderStyle="font-weight: bold;" />
+        <PropertyColumn Property="x => x.NroBooking" HeaderStyle="font-weight: bold;" />
+        <TemplateColumn Title="Status" HeaderStyle="font-weight: bold;" Sortable="false">
+            <CellTemplate>
+                <StatusChip Status="@context.Item.BookingStatus" />
+            </CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.PO" HeaderStyle="font-weight: bold;" />
+        <PropertyColumn Property="x => x.Vessel" HeaderStyle="font-weight: bold;" />
+        <PropertyColumn Property="x => x.Voyage" HeaderStyle="font-weight: bold;" />
+        <PropertyColumn Property="x => x.ShippingCompany" HeaderStyle="font-weight: bold;" />
+        <PropertyColumn Property="x => x.POL" HeaderStyle="font-weight: bold;" />
+        <PropertyColumn Property="x => x.POD" HeaderStyle="font-weight: bold;" />
+        <PropertyColumn Property="x => x.Shipper" HeaderStyle="font-weight: bold;" />
+        <PropertyColumn Property="x => x.Commodity" HeaderStyle="font-weight: bold;" />
+        <PropertyColumn Property="x => x.QtyContainers" Title="Q CTN" HeaderStyle="font-weight: bold;" />
+        <PropertyColumn Property="x => x.BL" HeaderStyle="font-weight: bold;" />
+        <PropertyColumn Property="x => x.Container" HeaderStyle="font-weight: bold;" />
+        <TemplateColumn CellClass="d-flex justify-center" Sortable="false">
+            <CellTemplate>
+                <MudStack Row>
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                        <MudMenuItem OnClick="@(() => OpenDialog(context.Item.BookingId))" Icon="@Icons.Material.Filled.Edit" IconSize="Size.Small">Edit</MudMenuItem>
+                        <MudMenuItem OnClick="@(() => OnDuplicate(context.Item.BookingId))" Icon="@Icons.Material.Filled.CopyAll" IconSize="Size.Small">Duplicate</MudMenuItem>
+                        <MudMenuItem OnClick="@(() => OpenPreInvoiceDialog(context.Item.BookingId))" Icon="@Icons.Material.Filled.ReceiptLong" IconSize="Size.Small">Pre-Invoice</MudMenuItem>
+                        <MudDivider />
+                        <MudMenuItem OnClick="@(() => OnDelete(context.Item.BookingId))" Icon="@Icons.Material.Filled.Delete" IconSize="Size.Small">Delete</MudMenuItem>
+                    </MudMenu>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+</EntityGridPage>
+
+
+@code {
+    List<BookingGrid> bookingList = new();
+    private BookingModel data = new();
+
+    private List<AgentModel> agentList = new();
+    private List<CommodityModel> commodityList = new();
+    private List<ShipperModel> shipperList = new();
+    private List<TransportCompanyModel> transportcompanyList = new();
+    private List<VesselModel> vesselList = new();
+    private List<BookingModel> booking = new();
+    private List<PortModel> polList = new();
+    private List<PortModel> podList = new();
+    private string Email = "";
+
+    private int seasonId = 0;
+
+    private string _searchString;
+    private bool _sortNameByLength;
+    bool isLoading = true;
+    List<BookingGrid> selectedBooking = new();
+    string format = "dd/MM/yyyy";
+
+    async Task FillData()
+    {
+        var lst = new List<Task>();
+
+        var commodityAsync = _commodityService.GetAllAsync();
+        var shipperAsync = _shipperService.GetAllAsync();
+        var transportcompanyAsync = _transportcompanyService.GetAllAsync();
+        var vesselAsync = _vesselService.GetAllAsync();
+        var bookingAsync = _bookingService.GetAllAsync();
+        var bookingGridAsync = _bookingService.GetAllGridAsync(seasonId);
+        var polAsync = _portService.GetAllAsync();
+        var podAsync = _portService.GetAllAsync();
+
+        lst.Add(commodityAsync);
+        lst.Add(shipperAsync);
+        lst.Add(transportcompanyAsync);
+        lst.Add(vesselAsync);
+        lst.Add(bookingAsync);
+        lst.Add(bookingGridAsync);
+        lst.Add(polAsync);
+        lst.Add(podAsync);
+
+        await Task.WhenAll(lst);
+
+        commodityList = await commodityAsync;
+        shipperList = await shipperAsync;
+        transportcompanyList = await transportcompanyAsync;
+        vesselList = await vesselAsync;
+        booking = await bookingAsync;
+        polList = await polAsync;
+        podList = await podAsync;
+        bookingList = await bookingGridAsync;
+
+        /*
+        * 
+        bookingList = (from b in booking
+        join c in commodityList on b.CommodityId equals c.CommodityId
+        join s in shipperList on b.ShipperId equals s.ShipperId
+        join t in transportcompanyList on b.TransportCompanyId equals t.TransportCompanyId
+        join v in vesselList on b.VesselId equals v.VesselId
+        join pol in polList on b.POLId equals pol.PortId
+        join pod in podList on b.LastPODId equals pod.PortId
+        select new BookingGrid()
+        {
+        BookingId = b.BookingId,
+        NroBooking = b.NroBooking,
+        NroRequest = b.NroRequest,
+        PO = b.PoRef,
+        Vessel = v.Vessel,
+        Voyage = b.Voyage,
+        ShippingCompany = t.TransportCompany,
+        POL = pol.Port,
+        POD = pod.Port,
+        ETD = b.LastETD,
+        Shipper = s.Shipper,
+        Commodity = c.Commodity,
+        BL = "",
+        Container = "",
+        Status = b.Status
+    }).ToList();
+    */
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await localStorage.SetItemAsync<string>("last", "booking");
+            isLoading = true;
+            //bookingList = await _bookingService.GetAllAsync();
+            seasonId = await localStorage.GetItemAsync<int>("season");
+            var user = await localStorage.GetItemAsync<string>("user");
+
+            var users = await _userService.GetAllAsync();
+            Email = users.Where(u => u.User == user).FirstOrDefault().Email;
+
+            await FillData();
+
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenDialog(int id)
+    {
+        var parameters = new DialogParameters<BookingForm> { { x => x.id, id } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.ExtraExtraLarge, FullScreen = true, FullWidth = true, BackdropClick = false, CloseButton = true  };
+        var dialog = await DialogService.ShowAsync<BookingForm>("Booking", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            isLoading = true;
+
+            await FillData();
+
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async void OnDelete(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete",
+            "Confirm to delete item?",
+            yesText: "Delete", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            var x = await _bookingService.DeleteAsync(id);
+            //bookingList = await _bookingService.GetAllAsync();
+            isLoading = true;
+
+            await FillData();
+
+            isLoading = false;
+            StateHasChanged();
+        }
+
+        StateHasChanged();
+    }
+
+    private async void OnSend(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Send",
+            "Confirm to send booking?",
+            yesText: "Send", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            //var x = await _bookingService.DeleteAsync(id);
+            //bookingList = await _bookingService.GetAllAsync();
+            //await FillData();
+        }
+
+        StateHasChanged();
+    }
+
+    private async void OnSendMultiple()
+    {
+        var total = selectedBooking.Count();
+        if (total < 1)
+        {
+            return;
+        }
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Send",
+            $"Confirm to send {total } booking to {Email}?",
+            yesText: "Send", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            var d = new BookingIdModel();
+            d.Email = Email;
+
+            foreach(var item in selectedBooking)
+            {
+                d.Id.Add(item.BookingId);
+            }
+
+            var x = await _bookingService.PostSendBookingAsync(d);
+
+            Show(x.Message, Severity.Info);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task OpenDialogStacking(int id)
+    {
+        var parameters = new DialogParameters<BookingStackingForm> { { x => x.id, id } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Large, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<BookingStackingForm>("booking", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            isLoading = true;
+
+            await FillData();
+
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenDialogFreeDays()
+    {
+        var parameters = new DialogParameters<BookingFreeDaysForm>();
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, BackdropClick = false, CloseButton = true };
+        await DialogService.ShowAsync<BookingFreeDaysForm>("Booking Free Days", parameters, options);
+    }
+
+    private async Task OpenDialogHsCode()
+    {
+        var parameters = new DialogParameters<BookingHsCodeForm>();
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Large, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<BookingHsCodeForm>("Booking HsCode", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            isLoading = true;
+            await FillData();
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    void SelectedItemsChanged(HashSet<BookingGrid> items)
+    {
+        selectedBooking.Clear();
+
+        foreach(var item in items)
+        {
+            selectedBooking.Add(item);
+        }
+    }
+
+    private async void OnDuplicate(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Duplicate",
+            "Confirm to duplicate booking?",
+            yesText: "Duplicate", cancelText: "Cancel", options: options);
+
+        if (result != true)
+        {
+            return;
+        }
+
+        try
+        {
+            isLoading = true;
+            var copied = await _bookingService.PostCopyAsync(id);
+            if (copied is null || copied.BookingId == 0)
+            {
+                Show("No se pudo duplicar el booking", Severity.Error);
+                return;
+            }
+
+            Show("Duplicate Success", Severity.Info);
+            await FillData();
+        }
+        catch (Exception)
+        {
+            Show("No se pudo duplicar el booking", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenPreInvoiceDialog(int bookingId)
+    {
+        var parameters = new DialogParameters<PreInvoiceForm> { { x => x.BookingId, bookingId } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        await DialogService.ShowAsync<PreInvoiceForm>("Pre-Invoice", parameters, options);
+    }
+
+    private Func<BookingGrid, object> _sortBy => x =>
+    {
+        if (_sortNameByLength)
+            return x.NroBooking.Length;
+        else
+            return x.NroBooking;
+    };
+
+    private Func<BookingGrid, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.ETDWeek.ToString().Contains(_searchString, StringComparison.OrdinalIgnoreCase) || 
+            x.ETD.Value.ToShortDateString().Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.NroBooking.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.NroRequest.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.PO.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Vessel.Contains(_searchString, StringComparison.OrdinalIgnoreCase) || 
+            x.Voyage.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.ShippingCompany.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.POL.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.POD.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Shipper.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.BL.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Container.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Commodity.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+
+    private Snackbar _snackbar;
+
+    void Show(string msg, Severity severity)
+    {
+        Snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomCenter;
+        _snackbar = Snackbar.Add(msg, severity);
+    }
+}

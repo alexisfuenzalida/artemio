@@ -1,0 +1,848 @@
+﻿@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+@using System.Globalization
+
+
+@inject ItineraryService _itineraryService
+@inject ItineraryDtlService _itinerarydtlService
+@inject ItineraryETDService _itineraryetdService
+@inject ItineraryTransportCompanyService _itinerarytransportcompanyService
+@inject PortService _portService
+@inject ServiceService _serviceService
+@inject TransportCompanyService _transportcompanyService
+@inject TransportCompanyServiceService _transportcompanyserviceService
+@inject TransportCompanyPolService _transportcompanypolService
+@inject TransportCompanyPodService _transportcompanypodService
+@inject VesselService _vesselService
+@inject TtService _ttService
+@inject StackingService _stackingService
+
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            Itinerary
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <FormSkeleton Rows="8" Columns="4" />
+        }
+        else
+        {
+<MudForm @ref="form">
+
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudDatePicker Margin="margin" Variant="Variant.Outlined" Editable="true" Label="ETD" DateChanged="((e) => AddDays(e))" Date="itinerary.ETD" DateFormat="@dateFormat" Clearable="true" FirstDayOfWeek="DayOfWeek.Monday" ShowWeekNumbers />
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                    <MudItem xs="9">
+                        <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="PortModel"
+                                         Label="POL"
+                                         SearchFunc="@SearchPOL1"
+                                         @bind-Value="pol"
+                                         Clearable
+                                         ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                         ToStringFunc="@(tc => tc is null ? null : $"{tc.Port}")"
+                                         CoerceText="false"
+                                         CoerceValue="false" />
+                    </MudItem>
+                    <MudItem xs="3">
+                        <MudFab Margin="Margin.Dense" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => TransportCompanyOpenDialog(new TransportCompanyModel()))" />
+                    </MudItem>
+
+                </MudGrid>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudSelect Margin="margin" 
+                    Variant="Variant.Outlined" 
+                    T="TransportCompanyModel" 
+                    Label="Ship. Company" 
+                    MultiSelection="true"
+                           ToStringFunc="@(sc=> sc is null ? null : $"{sc.TransportCompany}")"
+                    @bind-Value="value" 
+                    @bind-SelectedValues="options">
+                    @foreach (var item in transportcompanyList)
+                    {
+                        <MudSelectItem T="TransportCompanyModel" Value="@item">@item.TransportCompany</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            
+
+
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                    <MudItem xs="9">
+                        <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="TransportCompanyModel"
+                                         Label="Operator"
+                                         SearchFunc="@SearchTransportCompany"
+                        Value="tc"
+                                         ValueChanged="TransportCompanyOnBlur"
+                                                  Clearable
+                                          ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                          ToStringFunc="@(tc => tc is null ? null : $"{tc.TransportCompany}")"
+                                          CoerceText="false"
+                                          CoerceValue="false" />
+                     </MudItem>
+                     <MudItem xs="3">
+                         <MudFab Margin="Margin.Dense" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => TransportCompanyOpenDialog(new TransportCompanyModel()))" />
+                     </MudItem>
+
+                 </MudGrid>
+             </MudItem>
+
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                 <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                     <MudItem xs="9">
+                         <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="ServiceModel"
+                                          Label="Service"
+                                          SearchFunc="@SearchService"                         
+                         Value="se"
+                         ValueChanged="SearchStacking"
+                                                  Clearable
+                                          ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                          ToStringFunc="@(se=> se is null ? null : $"{se.Service}")"
+                                          CoerceText="false"
+                                          CoerceValue="false" />
+                     </MudItem>
+                     <MudItem xs="3">
+                         <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => ServiceOpenDialog(new ServiceModel()))" />
+                     </MudItem>
+                 </MudGrid>
+             </MudItem>
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                 <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                     <MudItem xs="9">
+                         <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="VesselModel"
+                                          Label="Vessel"
+                                          SearchFunc="@SearchVessel"
+                         @bind-Value="ve"
+                                                  Clearable
+                                          ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                          ToStringFunc="@(se=> se is null ? null : $"{se.Vessel}")"
+                                          CoerceText="false"
+                                          CoerceValue="false" />
+                     </MudItem>
+                     <MudItem xs="3">
+                         <MudFab Margin="margin" StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => VesselOpenDialog(new VesselModel()))" />
+                     </MudItem>
+                 </MudGrid>
+             </MudItem>
+
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" @bind-Value="itinerary.Voyage" Label="Voyage" Required="true" RequiredError="Voyage is required!" />
+             </MudItem>
+
+             <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" @bind-Value="itinerary.Stacking" Label="Stacking" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" @bind-Value="itinerary.LateArrival" Label="Late Arrival" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" @bind-Value="itinerary.ExtraLateArrival" Label="Extra Late Arrival" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="2" xxl="2">
+                <MudTextField Margin="margin" Variant="Variant.Outlined" T="string" @bind-Value="itinerary.CutOff" Label="Cut Off" />
+            </MudItem>
+
+             <MudItem xs="12">
+                 <MudGrid Justify="Justify.FlexStart">
+                    <MudItem xs="5">
+                        <MudCard Elevation="2">
+                            <MudCardHeader Style="background-color: var(--mud-palette-background);">
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.body1">POL Details</MudText>
+                                </CardHeaderContent>
+                                <CardHeaderActions>
+                                    <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                        <MudMenuItem OnClick="@(() => PortOpenDialog(new PortModel()))" Icon="@Icons.Material.Filled.Add" IconSize="Size.Small">Add Port</MudMenuItem>
+                                        <MudMenuItem OnClick="@(() => AddRowETD(new ItineraryETDModel()))" Icon="@Icons.Material.Filled.Add" IconSize="Size.Small">Add Row</MudMenuItem>
+                                    </MudMenu>
+                                </CardHeaderActions>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudItem xs="12">
+                                    <MudTable Items="@listItineraryETD" Hover="true" Breakpoint="Breakpoint.Sm" LoadingProgressColor="Color.Primary">
+                                        <HeaderContent>
+                                            <MudTh></MudTh>
+                                            <MudTh></MudTh>
+                                            <MudTh></MudTh>
+                                        </HeaderContent>
+                                        <RowTemplate>
+                                            <MudTd DataLabel="POL">
+                                                <MudAutocomplete T="PortModel" Margin="margin" Variant="Variant.Outlined"
+                                                         Value="@(portList.FirstOrDefault(c => c.PortId == context.POLId))"
+                                                         ValueChanged="@(newValue => POLChanged(newValue, context))"
+                                                         SearchFunc="@SearchPOL"
+                                                         ToStringFunc="@(c => c.Port)"
+                                                         Label="POL"
+                                                         ResetValueOnEmptyText="true"
+                                                         CoerceText="false"
+                                                         CoerceValue="false"
+                                                         Clearable />
+                                            </MudTd>
+                                            <MudTd DataLabel="ETD">
+                                                <MudDatePicker Margin="margin" Variant="Variant.Outlined" Editable="true" Label="ETD" @bind-Date="context.ETD" DateFormat="@dateFormat" Clearable="true" />
+                                            </MudTd>
+                                                <!--
+                                                <MudTd DataLabel="IsMain">
+
+                                                    <MudCheckBox @bind-Value="@context.IsMain" T="bool" Label="IsMain"></MudCheckBox>
+                                                    <MudSwitch T="bool" @bind-Value="@context.IsMain" Color="Color.Primary" />
+
+                                                </MudTd>
+                                                -->
+                                            <MudTd DataLabel="Remove">
+                                                <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                                    <MudMenuItem OnClick="@(() => SelectETD(context))" Icon="@Icons.Material.Filled.Check" IconSize="Size.Small">Select Main</MudMenuItem>
+                                                    <MudMenuItem OnClick="@(() => RemoveETD(context))" Icon="@Icons.Material.Filled.DeleteOutline" IconSize="Size.Small">Delete</MudMenuItem>
+                                                </MudMenu>
+                                            </MudTd>
+                                        </RowTemplate>
+                                    </MudTable>
+                                </MudItem>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+
+                    <MudItem xs="7">
+                         <MudCard Elevation="2">
+                             <MudCardHeader Style="background-color: var(--mud-palette-background);">
+                                 <CardHeaderContent>
+                                     <MudText Typo="Typo.body1">POD Details</MudText>
+                                 </CardHeaderContent>
+                                 <CardHeaderActions>
+                                     <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                         <MudMenuItem OnClick="@(() => PortOpenDialog(new PortModel()))" Icon="@Icons.Material.Filled.Add" IconSize="Size.Small">Add Port</MudMenuItem>
+                                         <MudMenuItem OnClick="@(() => AddRow(new ItineraryDetailModel()))" Icon="@Icons.Material.Filled.Add" IconSize="Size.Small">Add Row</MudMenuItem>
+                                        <MudMenuItem OnClick="@(() => SearchTT())" Icon="@Icons.Material.Filled.Search" IconSize="Size.Small">Search TT</MudMenuItem>
+                                     </MudMenu>
+                                 </CardHeaderActions>
+                             </MudCardHeader>
+                             <MudCardContent>
+                                 <MudItem xs="12">
+                                     <MudTable Items="@listItineraryDetails" Hover="true" Breakpoint="Breakpoint.Sm" LoadingProgressColor="Color.Primary">
+                                         <HeaderContent>
+                                             <MudTh></MudTh>
+                                             <MudTh></MudTh>
+                                             <MudTh></MudTh>
+                                             <MudTh></MudTh>
+                                         </HeaderContent>
+                                         <RowTemplate>
+                                             <MudTd DataLabel="POD">
+                                                <MudAutocomplete T="PortModel" Margin="margin" Variant="Variant.Outlined"
+                                                                 Value="@(portList.FirstOrDefault(c => c.PortId == context.PODId))"
+                                                                 ValueChanged="@(newValue => PODChanged(newValue, context))"
+                                                                 SearchFunc="@SearchPOD"
+                                                                 ToStringFunc="@(c => c.Port)"
+                                                                 Label="POD"
+                                                                 ResetValueOnEmptyText="true"
+                                                                 CoerceText="false"
+                                                                 CoerceValue="false"
+                                                                 Clearable />
+
+                                               
+                                            </MudTd>
+                                            <MudTd DataLabel="TT">
+                                                <MudTextField Margin="margin" Variant="Variant.Outlined" T="int" @bind-Value="context.TT" Label="TT" OnBlur="@((e) => AddTT(context.TT,context))" Required="true" RequiredError="TT is required!" />
+                                            </MudTd>
+                                            <MudTd DataLabel="ETA">
+                                                <MudDatePicker Margin="margin" Variant="Variant.Outlined" Editable="true" Label="ETA" @bind-Date="context.ETA" DateFormat="@dateFormat" Clearable="true" />
+                                            </MudTd>
+                                            <MudTd DataLabel="Remove">
+                                                <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                                    <MudMenuItem OnClick="@(() => RemoveDtl(context))" Icon="@Icons.Material.Filled.DeleteOutline" IconSize="Size.Small">Delete</MudMenuItem>
+                                                </MudMenu>
+                                            </MudTd>
+                                        </RowTemplate>
+                                    </MudTable>
+                                </MudItem>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                 </MudGrid>
+
+             </MudItem>
+         </MudGrid>
+             </MudForm>
+             }
+    </DialogContent>
+     <DialogActions>
+         <MudButton OnClick="Cancel">Cancel</MudButton>
+         <MudButton Disabled="@_processing" OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary">
+             @if (_processing)
+            {
+                <MudProgressCircular Color="Color.Primary" Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Loading</MudText>
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public int id { get; set; } = 0;
+
+    private ItineraryModel itinerary = new ItineraryModel();
+    private List<ItineraryDetailModel> listItineraryDetails = new List<ItineraryDetailModel>();
+    private List<ItineraryETDModel> listItineraryETD = new List<ItineraryETDModel>();
+    private List<ItineraryTransportCompanyModel> listItineraryTransportCompany = new List<ItineraryTransportCompanyModel>();
+
+    private List<PortModel> portList = new();
+    private List<PortModel> polList = new();
+    private List<PortModel> podList = new();
+    private List<ServiceModel> serviceList = new();
+    private List<TransportCompanyModel> transportcompanyList = new();
+    private List<VesselModel> vesselList = new();
+
+    private int seasonId = 0;
+    private bool _processing = false;
+    private MudForm? form;
+    private bool isLoading = true;
+    private Margin margin = Margin.Dense;
+    private bool _resetValueOnEmptyText = true;
+    private List<TtModel> ttList = new();
+    private List<TtDetailModel> ttdList = new();
+    private DateTime? lastETD = new();
+
+    private TransportCompanyModel value { get; set; } = new TransportCompanyModel();
+
+    private IEnumerable<TransportCompanyModel> options { get; set; } = new HashSet<TransportCompanyModel>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            seasonId = await localStorage.GetItemAsync<int>("season");
+
+            var lst = new List<Task>();
+
+            var portAsync = _portService.GetAllAsync();
+            var serviceAsync = _serviceService.GetAllAsync();
+            var transportcompanyAsync = _transportcompanyService.GetAllAsync();
+            var vesselAsync = _vesselService.GetAllAsync();
+            var ttAsync = _ttService.GetAllAsync();
+
+            lst.Add(portAsync);
+            lst.Add(serviceAsync);
+            lst.Add(transportcompanyAsync);
+            lst.Add(vesselAsync);
+            lst.Add(ttAsync);
+
+            await Task.WhenAll(lst);
+
+            portList = await portAsync;
+            serviceList = await serviceAsync;
+            transportcompanyList = await transportcompanyAsync;
+            vesselList = await vesselAsync;
+            ttList = await ttAsync;
+
+            tc = transportcompanyList.Where(t => t.TransportCompanyId == itinerary.OperatorId).FirstOrDefault() ?? new TransportCompanyModel();
+
+            if (id != 0)
+            {
+                itinerary = await _itineraryService.GetAsync(id);
+
+                TransportCompanyInputChange(itinerary.OperatorId);
+                serviceList = await _transportcompanyserviceService.GetAllAssignedAsync(itinerary.OperatorId);
+                polList = await _transportcompanypolService.GetAllAssignedAsync(itinerary.OperatorId);
+                podList = await _transportcompanypodService.GetAllAssignedAsync(itinerary.OperatorId);
+
+                ServiceInputChange(itinerary.ServiceId);
+                VesselInputChange(itinerary.VesselId);
+                POLInputChange(itinerary.POLId);
+
+                listItineraryDetails = await _itinerarydtlService.GetAsync(id);
+                listItineraryTransportCompany = await _itinerarytransportcompanyService.GetAsync(id);
+                listItineraryETD = await _itineraryetdService.GetAsync(id);
+
+                var tt = new List<TransportCompanyModel>();
+
+                foreach (var item in listItineraryTransportCompany)
+                {
+                    var x = new TransportCompanyModel();
+
+                    x = transportcompanyList.Where(t => t.TransportCompanyId == item.TransportCompanyId).FirstOrDefault();
+
+                    tt.Add(x);
+                }
+
+                options = tt.AsEnumerable();
+
+                lastETD = itinerary.ETD;
+
+            }
+            else
+            {
+                itinerary = new ItineraryModel();
+                listItineraryDetails.Clear();
+
+                listItineraryDetails = new List<ItineraryDetailModel>();
+                listItineraryTransportCompany = new List<ItineraryTransportCompanyModel>();
+                listItineraryETD = new List<ItineraryETDModel>();
+
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+        isLoading = false;
+    }
+
+    private async void SearchStacking(ServiceModel value)
+    {
+        try
+        {
+            se = value;
+
+            if(se == null) return;
+
+            if (se.ServiceId == 0) return;
+
+            var resp = await _stackingService.GetStSeAsync(se.ServiceId);
+
+            if(resp.Stacking != null)
+            {
+                itinerary.Stacking = resp.Stacking;
+                itinerary.LateArrival = resp.LateArrival;
+                itinerary.ExtraLateArrival = resp.ExtraLateArrival;
+                itinerary.CutOff = resp.CutOff;
+
+                StateHasChanged();
+            }
+        }
+        catch(Exception ex)
+        {
+            Show(ex.Message);
+        }
+
+
+    }
+
+    private void AddRow(ItineraryDetailModel bd)
+    {
+        listItineraryDetails.Add(bd);
+    }
+
+    private void RemoveDtl(ItineraryDetailModel bd)
+    {
+        listItineraryDetails.Remove(bd);
+    }
+
+    private void AddRowETD(ItineraryETDModel bd)
+    {
+        bd.ETD = DateTime.Now;
+        bd.IsMain = false;
+
+        listItineraryETD.Add(bd);
+    }
+
+    private void RemoveETD(ItineraryETDModel bd)
+    {
+        listItineraryETD.Remove(bd);
+    }
+
+    private void SelectETD(ItineraryETDModel bd)
+    {
+        if (bd.POLId == 0) return;
+
+        pol = portList.Where(p => p.PortId == bd.POLId).FirstOrDefault();
+        itinerary.ETD = bd.ETD;
+    }
+
+    private async Task SearchTT()
+    {
+        itinerary.ServiceId = se.ServiceId;
+        itinerary.POLId = pol.PortId;
+
+        if (itinerary.ServiceId == 0 || itinerary.POLId == 0) return;
+
+        ttdList = await _ttService.GetSearchDetailAsync(itinerary.ServiceId, itinerary.POLId);
+
+        listItineraryDetails.Clear();
+
+        foreach(var item in ttdList)
+        {
+            var id = new ItineraryDetailModel();
+
+            id.PODId = item.PODId;
+            id.ETA = itinerary.ETD.Value.AddDays(item.TT);
+            id.TT = item.TT;
+
+            listItineraryDetails.Add(id);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task Submit()
+    {
+
+        if (form is not null)
+        {
+            await form.Validate();
+            if (!form.IsValid)
+            {
+                return;
+            }
+        }
+
+        _processing = true;
+        var x = new ItineraryModel();
+
+        #region Valid Null
+        if (tc == null)
+        {
+            tc = new TransportCompanyModel();
+        }
+        itinerary.OperatorId = tc.TransportCompanyId;
+
+        if (se == null)
+        {
+            se = new ServiceModel();
+        }
+        itinerary.ServiceId = se.ServiceId;
+
+        if (ve == null)
+        {
+            ve = new VesselModel();
+        }
+        itinerary.VesselId = ve.VesselId;
+
+        if (pol == null)
+        {
+            pol = new PortModel();
+        }
+        itinerary.POLId = pol.PortId;
+        #endregion
+
+
+        CultureInfo cul = CultureInfo.CurrentCulture;
+        itinerary.Week = cul.Calendar.GetWeekOfYear(itinerary.ETD.Value, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+
+        if (itinerary.ItineraryId == 0)
+        {
+            itinerary.SeasonId = seasonId;
+
+            x = await _itineraryService.PostAsync(itinerary);
+
+        }
+        else
+        {
+            x = await _itineraryService.PutAsync(itinerary);
+        }
+
+        await _itineraryetdService.DeleteAsync(x.ItineraryId);
+
+        if(listItineraryETD != null && listItineraryETD.Count() > 0)
+        {
+            foreach (var item in listItineraryETD)
+            {
+                item.ItineraryId = x.ItineraryId;
+
+                var resp = await _itineraryetdService.PostAsync(item);
+            }
+        }
+        else
+        {
+            var ide = new ItineraryETDModel();
+            ide.ItineraryId = x.ItineraryId;
+            ide.POLId = x.POLId;
+            ide.ETD = x.ETD;
+            ide.IsMain = true;
+
+            var resp = await _itineraryetdService.PostAsync(ide);
+        }
+
+        await _itinerarytransportcompanyService.DeleteAsync(x.ItineraryId);
+
+        if (options.Count() > 0)
+        {
+            foreach (var item in options)
+            {
+                var itc = new ItineraryTransportCompanyModel();
+
+                itc.TransportCompanyId = item.TransportCompanyId;
+                itc.ItineraryId = x.ItineraryId;
+
+                var resp = await _itinerarytransportcompanyService.PostAsync(itc);
+            }
+        }
+
+        await _itinerarydtlService.DeleteAsync(x.ItineraryId);
+
+        if (listItineraryDetails != null)
+        {
+            foreach (var item in listItineraryDetails)
+            {
+                item.ItineraryId = x.ItineraryId;
+
+                var resp = await _itinerarydtlService.PostAsync(item);
+            }
+        }
+
+        _processing = false;
+        if (x == null)
+        {
+            Snackbar.Add("Could not save. Please try again.", Severity.Error);
+            return;
+        }
+        MudDialog.Close(true);
+    }
+
+    void Cancel() => MudDialog.Cancel();
+
+
+    async void OnPODChanged(int id, ItineraryDetailModel dt)
+    {
+        itinerary.POLId = pol.PortId;
+        dt.PODId = id;
+
+        if(itinerary.POLId==0 || id == 0) return;
+
+        ttdList = await _ttService.GetSearchDetailAsync(itinerary.ServiceId, itinerary.POLId);
+
+        var t = ttdList.Where(t => t.PODId == id).FirstOrDefault();
+
+        if (t != null)
+        {
+            //dt.TT = t.TT;
+            //dt.ETA = itinerary.ETD.Value.AddDays(t.TT);
+
+            AddTT(t.TT, dt);
+        }
+
+    }
+
+
+    void AddTT(int tt, ItineraryDetailModel dt)
+    {
+        dt.TT = tt;
+        dt.ETA = itinerary.ETD.Value.AddDays(tt);
+
+    }
+
+
+    void OnPOLChanged(int id, ItineraryETDModel dt)
+    {
+        dt.POLId = id;
+    }
+
+    void AddDays(DateTime? d)
+    {
+        itinerary.ETD = d;
+
+        var d1 = new DateTime(d.Value.Year, d.Value.Month, d.Value.Day);
+        var d2 = new DateTime(lastETD.Value.Year, lastETD.Value.Month, lastETD.Value.Day);
+
+        var dif = d1.Subtract(d2);
+
+        var days = dif.Days;
+
+
+        foreach(var item in listItineraryETD)
+        {
+            if (item.IsMain)
+            {
+                item.ETD = item.ETD.Value.AddDays(days);
+            }
+        }
+
+        foreach(var item in listItineraryDetails)
+        {
+            item.ETA = item.ETA.Value.AddDays(days);
+        }
+
+        lastETD = d;
+
+        StateHasChanged();
+    }
+
+    #region Modales
+    private async Task TransportCompanyOpenDialog(TransportCompanyModel s)
+    {
+        var parameters = new DialogParameters<TransportCompanyForm> { { x => x.transportcompany, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<TransportCompanyForm>("Shipping Company", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            transportcompanyList = await _transportcompanyService.GetAllAsync();
+        }
+    }
+    private async Task ServiceOpenDialog(ServiceModel s)
+    {
+        var parameters = new DialogParameters<ServiceForm> { { x => x.service, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<ServiceForm>("Service", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            serviceList = await _serviceService.GetAllAsync();
+        }
+    }
+    private async Task VesselOpenDialog(VesselModel s)
+    {
+        var parameters = new DialogParameters<VesselForm> { { x => x.vessel, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<VesselForm>("Vessel", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            vesselList = await _vesselService.GetAllAsync();
+        }
+    }
+    private async Task PortOpenDialog(PortModel s)
+    {
+        var parameters = new DialogParameters<PortForm> { { x => x.port, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<PortForm>("Port", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            portList = await _portService.GetAllAsync();
+        }
+    }
+    #endregion
+
+    #region Search Autocomplete
+
+    private async Task<IEnumerable<PortModel>> SearchPOL(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return polList;
+
+        return polList
+            .Where(x => x.Port.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+    private void POLChanged(PortModel? newValue, ItineraryETDModel itineraryETD)
+    {
+        if (newValue != null)
+        {
+            itineraryETD.POLId = newValue.PortId;
+            StateHasChanged();
+        }
+    }
+
+    private async Task<IEnumerable<PortModel>> SearchPOD(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return podList;
+
+        return podList
+            .Where(x => x.Port.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+    private void PODChanged(PortModel? newValue, ItineraryDetailModel itineraryDtl)
+    {
+        if (newValue != null)
+        {
+            itineraryDtl.PODId = newValue.PortId;
+            StateHasChanged();
+        }
+    }
+
+    private TransportCompanyModel tc = new();
+    async void TransportCompanyInputChange(int value)
+    {
+        itinerary.OperatorId = value;
+
+        serviceList = await _transportcompanyserviceService.GetAllAssignedAsync(value);
+        polList = await _transportcompanypolService.GetAllAssignedAsync(value);
+        podList = await _transportcompanypodService.GetAllAssignedAsync(value);
+        tc = transportcompanyList.Where(e => e.TransportCompanyId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<TransportCompanyModel>> SearchTransportCompany(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return transportcompanyList.ToArray();
+        return transportcompanyList.Where(x => x.TransportCompany.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+    async void TransportCompanyOnBlur(TransportCompanyModel value)
+    {
+        tc = value;
+        if (tc == null) return;
+
+        serviceList = await _transportcompanyserviceService.GetAllAssignedAsync(tc.TransportCompanyId);
+        polList = await _transportcompanypolService.GetAllAssignedAsync(tc.TransportCompanyId);
+        podList = await _transportcompanypodService.GetAllAssignedAsync(tc.TransportCompanyId);
+
+        StateHasChanged();
+    }
+    private ServiceModel se = new();
+    async void ServiceInputChange(int value)
+    {
+        itinerary.ServiceId = value;
+        se = serviceList.Where(e => e.ServiceId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<ServiceModel>> SearchService(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return serviceList.ToArray();
+        return serviceList.Where(x => x.Service.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private VesselModel ve = new();
+    async void VesselInputChange(int value)
+    {
+        itinerary.VesselId = value;
+        ve = vesselList.Where(e => e.VesselId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<VesselModel>> SearchVessel(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return vesselList.ToArray();
+        return vesselList.Where(x => x.Vessel.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private PortModel pol = new();
+    async void POLInputChange(int value)
+    {
+        itinerary.POLId = value;
+        pol = portList.Where(e => e.PortId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<PortModel>> SearchPOL1(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return polList.ToArray();
+        return polList.Where(x => x.Port.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+    #endregion
+
+    string dateFormat = "dd/MM/yyyy";
+    string bound = "not set";
+
+    private Snackbar _snackbar;
+
+    void Show(string msg)
+    {
+        Snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomCenter;
+        _snackbar = Snackbar.Add(msg, Severity.Error);
+    }
+}

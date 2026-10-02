@@ -1,0 +1,183 @@
+﻿@page "/tts"
+
+@using ArtemioBlazorWA.Forms;
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject TtService _ttService
+@inject PortService _portService
+@inject ServiceService _serviceService
+
+@inject IDialogService DialogService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject ISnackbar Snackbar
+
+<EntityGridPage T="TtGrid"
+                 Title="TT"
+                 Items="@TtList"
+                 IsLoading="@isLoading"
+                 @bind-SearchString="_searchString"
+                 QuickFilter="@_quickFilter"
+                 CreateLabel="Create"
+                 OnCreate="@(() => OpenDialog(0))"
+                 EmptyMessage="No hay resultados.">
+    <Columns>
+        <PropertyColumn Property="x => x.Service" Title="Service" />
+        <PropertyColumn Property="x => x.POL" Title="POL" />
+        <PropertyColumn Property="x => x._From.Value.ToShortDateString()" Title="From" />
+        <PropertyColumn Property="x => x._To.Value.ToShortDateString()" Title="To" />
+        <TemplateColumn CellClass="d-flex justify-center" Sortable="false" Filterable="false">
+            <CellTemplate>
+                <MudStack Row>
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                        <MudMenuItem OnClick="@(() => OpenDialog(context.Item.Id))" Icon="@Icons.Material.Filled.Edit" IconSize="Size.Small">Edit</MudMenuItem>
+                        <MudMenuItem OnClick="@(() => OnDelete(context.Item.Id))" Icon="@Icons.Material.Filled.Delete" IconSize="Size.Small">Delete</MudMenuItem>
+                    </MudMenu>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+</EntityGridPage>
+
+
+@code {
+    List<TtGrid> TtList = new();
+    List<TtModel> ttList = new();
+
+    private TtModel data = new();
+    private string _searchString;
+    private bool _sortNameByLength;
+    bool isLoading = true;
+
+
+    async Task FillData()
+    {
+        var lst = new List<Task>();
+
+        var serviceAsync = _serviceService.GetAllAsync();
+        var polAsync = _portService.GetAllAsync();
+        var podAsync = _portService.GetAllAsync();
+
+        var ttAsync = _ttService.GetAllAsync();
+
+        lst.Add(serviceAsync);
+        lst.Add(polAsync);
+        lst.Add(podAsync);
+        lst.Add(ttAsync);
+
+        await Task.WhenAll(lst);
+
+        var serviceList = await serviceAsync;
+        var polList = await polAsync;
+        var podList = await podAsync;
+
+        ttList = await ttAsync;
+
+
+        TtList = (from t in ttList
+                  join pol in polList on t.POLId equals pol.PortId
+                  join se in serviceList on t.ServiceId equals se.ServiceId
+                  select new TtGrid()
+                           {
+                               Id = t.Id,
+                               Service = se.Service,
+                               POL = pol.Port,
+                               _From=t._From,
+                               _To=t._To
+                           }).ToList();
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await localStorage.SetItemAsync<string>("last", "tts");
+            isLoading = true;
+
+            await FillData();
+
+            if (TtList == null)
+            {
+                TtList = new List<TtGrid>();
+            }
+
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenDialog(int id)
+    {
+        var s = ttList.Where(e => e.Id == id).FirstOrDefault();
+
+        if(s == null)
+        {
+            s = new TtModel();
+        }
+
+        var parameters = new DialogParameters<TtForm> { { x => x.Tt, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<TtForm>("Tt", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await FillData();
+        }
+    }
+
+    private async void OnDelete(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete",
+            "Confirm to delete item?",
+            yesText: "Delete", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+
+                    var x = await _ttService.DeleteAsync(id);
+                    x = await _ttService.DeleteDetailAsync(id);
+
+                    await FillData();
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Snackbar.Add("No se pudo eliminar el registro. Intenta nuevamente.", Severity.Error);
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private Func<TtGrid, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.POL.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+}

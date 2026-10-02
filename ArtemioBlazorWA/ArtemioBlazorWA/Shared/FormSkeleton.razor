@@ -1,0 +1,21 @@
+<MudStack Spacing="3" Class="pa-2">
+    @for (var row = 0; row < Rows; row++)
+    {
+        <MudGrid>
+            @for (var col = 0; col < Columns; col++)
+            {
+                <MudItem xs="12" md="@ColumnWidth">
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="@Height" Animation="Animation.Wave" />
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudStack>
+
+@code {
+    [Parameter] public int Rows { get; set; } = 4;
+    [Parameter] public int Columns { get; set; } = 1;
+    [Parameter] public string Height { get; set; } = "56px";
+
+    private int ColumnWidth => Math.Max(12 / Math.Max(Columns, 1), 1);
+}

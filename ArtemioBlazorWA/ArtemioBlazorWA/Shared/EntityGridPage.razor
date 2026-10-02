@@ -1,0 +1,98 @@
+@typeparam T
+@attribute [CascadingTypeParameter(nameof(T))]
+
+<PageHeader Title="@Title">
+    <SearchContent>
+        <MudTextField T="string"
+                      Variant="Variant.Text"
+                      Value="@SearchString"
+                      ValueChanged="@OnSearchChanged"
+                      Placeholder="Search"
+                      Adornment="Adornment.Start"
+                      Immediate="true"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Small"
+                      Class="mt-0"
+                      Style="max-width: 300px;" />
+    </SearchContent>
+    <ChildContent>
+        @HeaderActions
+        @if (ShowCreateButton)
+        {
+            <MudButton Variant="Variant.Filled"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Color="Color.Primary"
+                       Size="Size.Medium"
+                       OnClick="OnCreate">
+                @CreateLabel
+            </MudButton>
+        }
+    </ChildContent>
+</PageHeader>
+
+@if (IsLoading && (Items == null || Items.Count == 0))
+{
+    <GridSkeleton />
+}
+else if (!IsLoading && (Items == null || Items.Count == 0))
+{
+    <EmptyState Icon="@EmptyIcon"
+                Message="@EmptyMessage"
+                ActionLabel="@(ShowCreateButton ? CreateLabel : null)"
+                OnAction="OnCreate" />
+}
+else
+{
+    <MudDataGrid T="T"
+                 Items="@Items"
+                 Filterable="true"
+                 QuickFilter="@QuickFilter"
+                 Loading="@IsLoading"
+                 LoadingProgressColor="Color.Primary"
+                 Hover
+                 MultiSelection="@MultiSelection"
+                 SelectedItemsChanged="@SelectedItemsChanged"
+                 RowStyleFunc="@RowStyleFunc"
+                 Dense="true">
+        <Columns>
+            @Columns
+        </Columns>
+        <NoRecordsContent>
+            @NoRecordsContent
+        </NoRecordsContent>
+        <PagerContent>
+            <MudDataGridPager T="T" />
+        </PagerContent>
+    </MudDataGrid>
+}
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public RenderFragment? HeaderActions { get; set; }
+    [Parameter] public bool ShowCreateButton { get; set; } = true;
+    [Parameter] public string CreateLabel { get; set; } = "Create";
+    [Parameter] public EventCallback OnCreate { get; set; }
+
+    [Parameter] public List<T> Items { get; set; } = new();
+    [Parameter] public bool IsLoading { get; set; }
+
+    [Parameter] public string? SearchString { get; set; }
+    [Parameter] public EventCallback<string?> SearchStringChanged { get; set; }
+    [Parameter] public Func<T, bool>? QuickFilter { get; set; }
+
+    [Parameter] public RenderFragment Columns { get; set; } = default!;
+    [Parameter] public RenderFragment? NoRecordsContent { get; set; }
+
+    [Parameter] public string EmptyMessage { get; set; } = "No hay resultados.";
+    [Parameter] public string EmptyIcon { get; set; } = Icons.Material.Filled.Inbox;
+
+    [Parameter] public bool MultiSelection { get; set; }
+    [Parameter] public EventCallback<HashSet<T>> SelectedItemsChanged { get; set; }
+    [Parameter] public Func<T, int, string>? RowStyleFunc { get; set; }
+
+    private async Task OnSearchChanged(string? value)
+    {
+        SearchString = value;
+        await SearchStringChanged.InvokeAsync(value);
+    }
+}

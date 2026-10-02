@@ -1,0 +1,144 @@
+﻿@page "/incidences"
+
+@using ArtemioBlazorWA.Forms;
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject BookingIncidenceService _bookingincidenceService
+@inject IDialogService DialogService
+
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject ISnackbar Snackbar
+
+<EntityGridPage T="BookingIncidenceGrid"
+                 Title="Booking Incidences"
+                 Items="@bookingincidenceList"
+                 IsLoading="@isLoading"
+                 @bind-SearchString="_searchString"
+                 QuickFilter="@_quickFilter"
+                 ShowCreateButton="false"
+                 EmptyMessage="No hay incidencias.">
+    <Columns>
+        <PropertyColumn Property="x => x.NroBooking" />
+        <PropertyColumn Property="x => x.NroRequest" />
+        <PropertyColumn Property="x => x.BL" />
+        <PropertyColumn Property="x => x.Container" />
+        <PropertyColumn Property="x => x.Consignee" />
+        <PropertyColumn Property="x => x.Notify" />
+        <PropertyColumn Property="x => x.Incidences" />
+        <TemplateColumn CellClass="d-flex justify-center" Sortable="false" Filterable="false">
+            <CellTemplate>
+                <MudStack Row>
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                        <MudMenuItem OnClick="@(() => OpenDialog(context.Item.BookingId, context.Item.Container))" Icon="@Icons.Material.Filled.Edit" IconSize="Size.Small">Edit</MudMenuItem>
+                        <MudMenuItem OnClick="@(() => OnDelete(context.Item.BookingId,context.Item.Container))" Icon="@Icons.Material.Filled.Delete" IconSize="Size.Small">Delete</MudMenuItem>
+                    </MudMenu>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+</EntityGridPage>
+
+
+@code {
+    List<BookingIncidenceGrid> bookingincidenceList = new();
+
+    private string _searchString;
+    private bool _sortNameByLength;
+    bool isLoading = true;
+    int seasonId = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await localStorage.SetItemAsync<string>("last", "incidences");
+            isLoading = true;
+            seasonId = await localStorage.GetItemAsync<int>("season");
+
+            bookingincidenceList = await _bookingincidenceService.GetAllAsync(seasonId);
+
+            if (bookingincidenceList == null)
+            {
+                bookingincidenceList = new List<BookingIncidenceGrid>();
+            }
+
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenDialog(int id, string container)
+    {
+        var s = await _bookingincidenceService.GetAsync(id,container);
+
+        var parameters = new DialogParameters<BookingIncidenceForm> { { x => x.bookingincidenceList, s },{ x => x.BookingId,id},{ x => x.Container, container} };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Large, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<BookingIncidenceForm>("bookingincidence", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            bookingincidenceList = await _bookingincidenceService.GetAllAsync(seasonId);
+        }
+    }
+
+    private async void OnDelete(int id,string container)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete",
+            "Confirm to delete item?",
+            yesText: "Delete", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+
+                var x = await _bookingincidenceService.DeleteAsync(id, container);
+                bookingincidenceList = await _bookingincidenceService.GetAllAsync(seasonId);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Snackbar.Add("No se pudo eliminar el registro. Intenta nuevamente.", Severity.Error);
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private Func<BookingIncidenceGrid, object> _sortBy => x =>
+    {
+        if (_sortNameByLength)
+            return x.NroBooking;
+        else
+            return x.NroBooking;
+    };
+
+    private Func<BookingIncidenceGrid, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.NroRequest.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+}

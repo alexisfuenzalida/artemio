@@ -1,0 +1,136 @@
+﻿@page "/costitems"
+
+@using ArtemioBlazorWA.Forms;
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject CostItemService _costitemService
+@inject IDialogService DialogService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject ISnackbar Snackbar
+
+<EntityGridPage T="CostItemModel"
+                 Title="CostItems Carga"
+                 Items="@costitemList"
+                 IsLoading="@isLoading"
+                 @bind-SearchString="_searchString"
+                 QuickFilter="@_quickFilter"
+                 CreateLabel="Create"
+                 OnCreate="@(() => OpenDialog(new CostItemModel()))"
+                 EmptyMessage="No hay resultados.">
+    <Columns>
+             <PropertyColumn Property="x => x.CostItemId" Title="Id" />
+             <PropertyColumn Property="x => x.CostItem" Title="CostItem" />
+             <PropertyColumn Property="x => x.GroupItem" Title="GroupItem" />
+             <TemplateColumn CellClass="d-flex justify-center" Sortable="false" Filterable="false">
+                 <CellTemplate>
+                     <MudStack Row>
+                     <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                         <MudMenuItem OnClick="@(() => OpenDialog(context.Item))" Icon="@Icons.Material.Filled.Edit" IconSize="Size.Small">Edit</MudMenuItem>
+                         <MudMenuItem OnClick="@(() => OnDelete(context.Item.CostItemId))" Icon="@Icons.Material.Filled.Delete" IconSize="Size.Small">Delete</MudMenuItem>
+                     </MudMenu>
+                 </MudStack>
+             </CellTemplate>
+         </TemplateColumn>
+    </Columns>
+</EntityGridPage>
+
+
+@code {
+    List<CostItemModel> costitemList = new();
+    private CostItemModel data = new();
+    private string _searchString;
+    private bool _sortNameByLength;
+    bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await localStorage.SetItemAsync<string>("last", "costitems");
+            isLoading = true;
+            costitemList = await _costitemService.GetAllAsync();
+
+            if (costitemList == null)
+            {
+                costitemList = new List<CostItemModel>();
+            }
+
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenDialog(CostItemModel s)
+    {
+        var parameters = new DialogParameters<CostItemForm> { { x => x.costitem, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<CostItemForm>("Cost Item", parameters, options);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            costitemList = await _costitemService.GetAllAsync();
+        }
+    }
+
+    private async void OnDelete(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete",
+            "Confirm to delete item?",
+            yesText: "Delete", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+
+                    var x = await _costitemService.DeleteAsync(id);
+                    costitemList = await _costitemService.GetAllAsync();
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Snackbar.Add("No se pudo eliminar el registro. Intenta nuevamente.", Severity.Error);
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private Func<CostItemModel, object> _sortBy => x =>
+    {
+        if (_sortNameByLength)
+            return x.CostItem.Length;
+        else
+            return x.CostItem;
+    };
+
+    private Func<CostItemModel, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.CostItem.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+}

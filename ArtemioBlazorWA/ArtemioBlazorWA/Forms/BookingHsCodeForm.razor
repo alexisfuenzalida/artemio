@@ -1,0 +1,137 @@
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject BookingService _bookingService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            Booking HsCode
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <GridSkeleton />
+        }
+        else
+        {
+
+        <MudGrid>
+            <MudItem xs="12">
+                <MudDataGrid T="BookingHsCodeGrid"
+                             Items="@bookingHsCodeList"
+                             Filterable="true"
+                             QuickFilter="@_quickFilter"
+                             Loading="@isLoading"
+                             LoadingProgressColor="Color.Primary"
+                             Dense="true">
+                    <ToolBarContent>
+                        <MudSpacer />
+                        <MudTextField Class="mt-1" Variant="Variant.Text" @bind-Value="_searchString" Placeholder="Search" Adornment="Adornment.Start" Immediate="true"
+                                      AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Small"></MudTextField>
+                    </ToolBarContent>
+                    <Columns>
+                        <PropertyColumn Property="x => x.Shipper" Title="Shipper" HeaderStyle="font-weight: bold;" />
+                        <PropertyColumn Property="x => x.Commodity" Title="Commodity" HeaderStyle="font-weight: bold;" />
+                        <TemplateColumn Title="HsCode" HeaderStyle="font-weight: bold;">
+                            <CellTemplate>
+                                <MudTextField T="string"
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Value="@context.Item.HsCode"
+                                              ValueChanged="@((string value) => context.Item.HsCode = value ?? string.Empty)"
+                                              Immediate="true" />
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                    <PagerContent>
+                        <MudDataGridPager T="BookingHsCodeGrid" />
+                    </PagerContent>
+                </MudDataGrid>
+            </MudItem>
+        </MudGrid>
+            }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Disabled="@_processing" OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary">
+            @if (_processing)
+            {
+                <MudProgressCircular Color="Color.Primary" Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Loading</MudText>
+            }
+            else
+            {
+                <MudText>Update</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+    private List<BookingHsCodeGrid> bookingHsCodeList = new();
+    private bool _processing = false;
+    private string _searchString = "";
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+            bookingHsCodeList = await _bookingService.GetBookingHsCodeAsync() ?? new List<BookingHsCodeGrid>();
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+        isLoading = false;
+    }
+
+    private async Task Submit()
+    {
+        _processing = true;
+        var updated = await _bookingService.PutBookingHsCodeAsync(bookingHsCodeList);
+        _processing = false;
+
+        if (!updated)
+        {
+            Show("Error updating HsCode.");
+            return;
+        }
+
+        MudDialog.Close(true);
+    }
+
+    void Cancel() => MudDialog.Cancel();
+
+    private Func<BookingHsCodeGrid, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.Shipper.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Commodity.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.HsCode.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+
+    private Snackbar _snackbar;
+
+    void Show(string msg)
+    {
+        Snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomCenter;
+        _snackbar = Snackbar.Add(msg, Severity.Error);
+    }
+}

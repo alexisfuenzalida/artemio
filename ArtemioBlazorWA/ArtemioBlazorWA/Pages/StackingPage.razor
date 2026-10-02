@@ -1,0 +1,187 @@
+﻿@page "/stacking"
+
+@using ArtemioBlazorWA.Forms;
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject StackingService _stackingService
+@inject TransportCompanyService _transportcompanyService
+@inject ServiceService _serviceService
+@inject VesselService _vesselService
+
+@inject IDialogService DialogService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject ISnackbar Snackbar
+
+<EntityGridPage T="StackingGrid"
+                 Title="Stacking"
+                 Items="@stackingGrid"
+                 IsLoading="@isLoading"
+                 @bind-SearchString="_searchString"
+                 QuickFilter="@_quickFilter"
+                 CreateLabel="Create"
+                 OnCreate="@(() => OpenDialog(new StackingGrid()))"
+                 EmptyMessage="No hay resultados.">
+    <Columns>
+        <PropertyColumn Property="x => x.StackingId" Title="Id" />
+        <PropertyColumn Property="x => x.Week" Title="Week" />
+        <PropertyColumn Property="x => x.Service" Title="Service" />
+        <PropertyColumn Property="x => x.Stacking" Title="Stacking" />
+        <PropertyColumn Property="x => x.LateArrival" Title="Late" />
+        <TemplateColumn CellClass="d-flex justify-center" Sortable="false" Filterable="false">
+            <CellTemplate>
+                <MudStack Row>
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                        <MudMenuItem OnClick="@(() => OpenDialog(context.Item))" Icon="@Icons.Material.Filled.Edit" IconSize="Size.Small">Edit</MudMenuItem>
+                        <MudMenuItem OnClick="@(() => OnDelete(context.Item.StackingId))" Icon="@Icons.Material.Filled.Delete" IconSize="Size.Small">Delete</MudMenuItem>
+                    </MudMenu>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+</EntityGridPage>
+
+
+@code {
+    List<StackingGrid> stackingGrid = new();
+
+    private string _searchString;
+    private bool _sortNameByLength;
+    bool isLoading = true;
+
+    async Task FillData()
+    {
+        var lst = new List<Task>();
+
+        var stackingAsync = _stackingService.GetAllAsync();
+        var transportcompanyAsync = _transportcompanyService.GetAllAsync();
+        var serviceAsync = _serviceService.GetAllAsync();
+        var vesselAsync = _vesselService.GetAllAsync();
+
+        lst.Add(stackingAsync);
+        lst.Add(transportcompanyAsync);
+        lst.Add(serviceAsync);
+        lst.Add(vesselAsync);
+
+        await Task.WhenAll(lst);
+
+        var stackingList = await stackingAsync;
+        var transportcompanyList = await transportcompanyAsync;
+        var serviceList = await serviceAsync;
+        var vesselList = await vesselAsync;
+
+        stackingGrid = (from s in stackingList
+                        join se in serviceList on s.ServiceId equals se.ServiceId
+                        select new StackingGrid()
+            {
+                StackingId = s.StackingId,
+                Week = s.Week,
+                Service = se.Service,
+                Stacking = s.Stacking,
+                LateArrival = s.LateArrival
+            }).ToList();
+
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await localStorage.SetItemAsync<string>("last", "stacking");
+            isLoading = true;
+            await FillData();
+
+            if (stackingGrid == null)
+            {
+                stackingGrid = new List<StackingGrid>();
+            }
+
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenDialog(StackingGrid sg)
+    {
+        var s = new StackingModel();
+
+        if(sg.StackingId > 0)
+        {
+            s = await _stackingService.GetAsync(sg.StackingId);
+        }
+
+        var parameters = new DialogParameters<StackingForm> { { x => x.stacking, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<StackingForm>("Stacking", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await FillData();
+        }
+    }
+
+    private async void OnDelete(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete",
+            "Confirm to delete item?",
+            yesText: "Delete", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+
+                    var x = await _stackingService.DeleteAsync(id);
+                    await FillData();
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Snackbar.Add("No se pudo eliminar el registro. Intenta nuevamente.", Severity.Error);
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private Func<StackingGrid, object> _sortBy => x =>
+    {
+        if (_sortNameByLength)
+            return x.Stacking.Length;
+        else
+            return x.Stacking;
+    };
+
+    private Func<StackingGrid, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.Stacking.ToString().Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Stacking.ToString().Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.LateArrival.ToString().Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Week.ToString().Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.Service.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+}

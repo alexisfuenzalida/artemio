@@ -1,0 +1,316 @@
+﻿@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+@using ArtemioBlazorWA.Forms;
+
+@inject TtService _ttService
+@inject PortService _portService
+@inject ServiceService _serviceService
+
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            TT
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <FormSkeleton Rows="8" Columns="4" />
+        }
+        else
+        {
+<MudForm @ref="form">
+
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                    <MudItem xs="9">
+                        <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="ServiceModel"
+                                         Label="Service"
+                                         SearchFunc="@SearchService"
+                                         @bind-Value="se"
+                                         Clearable
+                                         ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                         ToStringFunc="@(se=> se is null ? null : $"{se.Service}")"
+                                         CoerceText="false"
+                                         CoerceValue="false" />
+                    </MudItem>
+                    <MudItem xs="3">
+                        <MudFab StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => OpenDialogService(new ServiceModel()))" />
+                    </MudItem>
+                </MudGrid>
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudGrid Justify="Justify.Center" Style="align-items: center;">
+                    <MudItem xs="9">
+                        <MudAutocomplete Margin="margin" Variant="Variant.Outlined" T="PortModel"
+                                         Label="POL"
+                                         SearchFunc="@SearchPOL"
+                                         @bind-Value="pol"
+                                         Clearable
+                                         ResetValueOnEmptyText="_resetValueOnEmptyText"
+                                         ToStringFunc="@(po=> po is null ? null : $"{po.Port}")"
+                                         CoerceText="false"
+                                         CoerceValue="false" />
+                    </MudItem>
+                    <MudItem xs="3">
+                        <MudFab StartIcon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small" OnClick="@(() => OpenDialog(new PortModel()))" />
+                    </MudItem>
+                </MudGrid>
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudDatePicker Margin="margin" Variant="Variant.Outlined" Editable="true" Label="Vigency From" @bind-Date="Tt._From" Clearable="true" ShowWeekNumbers />
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudDatePicker Margin="margin" Variant="Variant.Outlined" Editable="true" Label="Vigency To" @bind-Date="Tt._To" Clearable="true" ShowWeekNumbers />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudCard Elevation="2">
+                    <MudCardHeader Style="background-color: var(--mud-palette-background);">
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.body1">POD Details</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                <MudMenuItem OnClick="@(() => AddRow(new TtDetailModel()))" Icon="@Icons.Material.Filled.Add" IconSize="Size.Small">Add Row</MudMenuItem>
+                            </MudMenu>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudItem xs="12">
+                            <MudTable Items="@dtlList" Hover="true" Breakpoint="Breakpoint.Sm" LoadingProgressColor="Color.Primary">
+                                <HeaderContent>
+                                    <MudTh></MudTh>
+                                    <MudTh></MudTh>
+                                    <MudTh></MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="POD">
+                                        <MudSelect Margin="margin" Variant="Variant.Outlined" T="int" Label="POD" @bind-Value="context.PODId" Required="true" RequiredError="POD is required!"
+                                                   ToStringFunc="@(id => portList.FirstOrDefault(p => p.PortId == id)?.Port)">
+                                            @foreach (var item in portList)
+                                            {
+                                                <MudSelectItem T="int" Value="@item.PortId">@item.Port</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    </MudTd>
+                                    <MudTd DataLabel="Amount">
+                                        <MudNumericField Margin="margin" Variant="Variant.Outlined" T="int" @bind-Value="context.TT" Label="TT" RequiredError="Tt is required!" />
+                                    </MudTd>
+                                    <MudTd DataLabel="Remove">
+                                        <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                            <MudMenuItem OnClick="@(() => RemoveDtl(context))" Icon="@Icons.Material.Filled.DeleteOutline" IconSize="Size.Small">Delete</MudMenuItem>
+                                        </MudMenu>
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        </MudItem>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+            </MudForm>
+            }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Disabled="@_processing" OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary">
+            @if (_processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Processing</MudText>
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public TtModel Tt { get; set; } = new TtModel();
+
+    private List<PortModel> portList = new();
+    private List<ServiceModel> serviceList = new();
+    public List<TtDetailModel> dtlList = new();
+
+    private Margin margin = Margin.Dense;
+    private bool _resetValueOnEmptyText = true;
+    private bool _processing = false;
+    private MudForm? form;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            portList = await _portService.GetAllAsync();
+
+            if (portList == null)
+            {
+                portList = new List<PortModel>();
+            }
+
+            serviceList = await _serviceService.GetAllAsync();
+
+            if (serviceList == null)
+            {
+                serviceList = new List<ServiceModel>();
+            }
+
+            if (Tt.Id > 0)
+            {
+                ServiceInputChange(Tt.ServiceId);
+                POLInputChange(Tt.POLId);
+
+                dtlList = await _ttService.GetAllDetailAsync(Tt.Id);
+
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+        isLoading = false;
+    }
+
+    private void AddRow(TtDetailModel td)
+    {
+        dtlList.Add(td);
+    }
+
+    private void RemoveDtl(TtDetailModel bd)
+    {
+        dtlList.Remove(bd);
+    }
+
+    private async Task Submit()
+    {
+
+        if (form is not null)
+        {
+            await form.Validate();
+            if (!form.IsValid)
+            {
+                return;
+            }
+        }
+        Tt.POLId = pol.PortId;
+        Tt.ServiceId = se.ServiceId;
+
+        if ( Tt.ServiceId == 0 || Tt.POLId == 0)
+        {
+            Show("Service, POL are required!", Severity.Error);
+
+            return;
+        }
+
+        var x = new TtModel();
+
+        _processing = true;
+
+        if (Tt.Id == 0)
+        {
+            x = await _ttService.PostAsync(Tt);
+        }
+        else
+        {
+            x = await _ttService.PutAsync(Tt);
+        }
+
+        if (dtlList.Count > 0)
+        {
+            await _ttService.DeleteDetailAsync(x.Id);
+
+            foreach(var item in dtlList)
+            {
+                item.Id = x.Id;
+
+                var y = await _ttService.PostDetailAsync(item);
+            }
+        }
+
+        _processing = false;
+        if (x == null)
+        {
+            Snackbar.Add("Could not save. Please try again.", Severity.Error);
+            return;
+        }
+        MudDialog.Close(true);
+    }
+
+    void Cancel() => MudDialog.Cancel();
+
+    private async Task OpenDialogService(ServiceModel s)
+    {
+        var parameters = new DialogParameters<ServiceForm> { { x => x.service, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<ServiceForm>("Service", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            serviceList = await _serviceService.GetAllAsync();
+        }
+    }
+
+    private async Task OpenDialog(PortModel s)
+    {
+        var parameters = new DialogParameters<PortForm> { { x => x.port, s } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<PortForm>("Port", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            portList = await _portService.GetAllAsync();
+        }
+    }
+
+    private Snackbar? _snackbar;
+
+    void Show(string msg, Severity severity)
+    {
+        _snackbar = Snackbar.Add(msg, severity);
+    }
+
+    private ServiceModel se = new();
+    async void ServiceInputChange(int value)
+    {
+        Tt.ServiceId = value;
+        se = serviceList.Where(e => e.ServiceId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<ServiceModel>> SearchService(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return serviceList.ToArray();
+        return serviceList.Where(x => x.Service.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private PortModel pol = new();
+    async void POLInputChange(int value)
+    {
+        Tt.POLId = value;
+        pol = portList.Where(e => e.PortId == value).FirstOrDefault();
+    }
+    private async Task<IEnumerable<PortModel>> SearchPOL(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return portList.ToArray();
+        return portList.Where(x => x.Port.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+}

@@ -1,0 +1,282 @@
+﻿@page "/contracts"
+
+@using ArtemioBlazorWA.Forms;
+@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject ContractService _contractService
+@inject CommodityService _commodityService
+@inject TransportCompanyService _transportcompanyService
+@inject PortService _portService
+@inject ServiceService _serviceService
+
+@inject IDialogService DialogService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+@inject ISnackbar Snackbar
+
+<EntityGridPage T="ContractGrid"
+                 Title="Contract"
+                 Items="@contractList"
+                 IsLoading="@isLoading"
+                 @bind-SearchString="_searchString"
+                 QuickFilter="@_quickFilter"
+                 CreateLabel="Create"
+                 OnCreate="@(() => OpenDialog(0))"
+                 MultiSelection="true"
+                 SelectedItemsChanged="@SelectedItemsChanged"
+                 EmptyMessage="No hay contratos.">
+    <HeaderActions>
+        <MudButton Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.FileDownload"
+                   Color="Color.Primary"
+                   Size="Size.Medium"
+                   OnClick="@(() => OpenFilterDialog())">
+            Download
+        </MudButton>
+    </HeaderActions>
+    <Columns>
+        <SelectColumn T="ContractGrid" />
+        <PropertyColumn Property="x => x.TransportCompany" Title="Ship.Co" Filterable="false" />
+        <PropertyColumn Property="x => x.NroContract" Filterable="false" />
+        <PropertyColumn Property="x => x.From!.ToShortDateString()" Title="From" Filterable="false" />
+        <PropertyColumn Property="x => x.Until.ToShortDateString()" Title="To" Filterable="false" />
+        <TemplateColumn Title="Vigencia" Sortable="false" Filterable="false">
+            <CellTemplate>
+                @{
+                    var isExpired = DateTime.Now > context.Item.Until;
+                    var isExpiringSoon = !isExpired && DateTime.Now.AddDays(10) > context.Item.Until;
+                    var vigColor = isExpired ? Color.Error : isExpiringSoon ? Color.Warning : Color.Success;
+                    var vigText = isExpired ? "Vencido" : isExpiringSoon ? "Por vencer" : "Vigente";
+                }
+                <MudChip T="string" Color="@vigColor" Variant="Variant.Filled" Size="Size.Small">@vigText</MudChip>
+            </CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.Commodity" Filterable="false" />
+        <PropertyColumn Property="x => x.POL" Filterable="false" />
+        <PropertyColumn Property="x => x.POD" Filterable="false" />
+        <PropertyColumn Property="x => x.TT" Filterable="false" />
+        <PropertyColumn Property="x => x.Public" Filterable="false" />
+        <PropertyColumn Property="x => x.Net" Filterable="false" />
+        <PropertyColumn Property="x => x.VD" Filterable="false" />
+        <PropertyColumn Property="x => x.Sum" Filterable="false" />
+        <PropertyColumn Property="x => x.RateType" Filterable="false" />
+        <TemplateColumn CellClass="d-flex justify-center" Sortable="false" Filterable="false">
+            <CellTemplate>
+                <MudStack Row>
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                        <MudMenuItem OnClick="@(() => OpenDialog(context.Item.ContractId))" Icon="@Icons.Material.Filled.Edit" IconSize="Size.Small">Edit</MudMenuItem>
+                        <MudMenuItem OnClick="@(() => OnDuplicate(context.Item.ContractId))" Icon="@Icons.Material.Filled.CopyAll" IconSize="Size.Small">Duplicate</MudMenuItem>
+                        <MudMenuItem OnClick="@(() => OnDelete(context.Item.ContractId))" Icon="@Icons.Material.Filled.Delete" IconSize="Size.Small">Delete</MudMenuItem>
+                    </MudMenu>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+</EntityGridPage>
+
+
+@code {
+    List<ContractGrid> contractList = new();
+    /*
+     * 
+    private ContractModel data = new();
+
+    private List<AgentModel> agentList = new();
+    private List<CommodityModel> commodityList = new();
+    private List<ShipperModel> shipperList = new();
+    private List<TransportCompanyModel> transportcompanyList = new();
+    private List<VesselModel> vesselList = new();
+    private List<ContractModel> contract = new();
+    private List<PortModel> polList = new();
+    private List<PortModel> podList = new();
+     */
+    private string Email = "";
+
+    private int seasonId = 0;
+
+    private string _searchString;
+    private bool _sortNameByLength;
+    bool isLoading = true;
+    List<ContractGrid> selectedContract = new();
+
+    async Task FillData()
+    {
+        var lst = new List<Task>();
+        /*
+         * 
+        var commodityAsync = _commodityService.GetAllAsync();
+        var transportcompanyAsync = _transportcompanyService.GetAllAsync();
+        var contractAsync = _contractService.GetAllAsync();
+        var polAsync = _portService.GetAllAsync();
+        var podAsync = _portService.GetAllAsync();
+        
+        lst.Add(commodityAsync);
+        lst.Add(transportcompanyAsync);
+        lst.Add(contractAsync);
+        lst.Add(polAsync);
+        lst.Add(podAsync);
+
+        commodityList = await commodityAsync;
+        transportcompanyList = await transportcompanyAsync;
+        contract = await contractAsync;
+        polList = await polAsync;
+        podList = await podAsync;
+         */
+
+        var contractGridAsync = _contractService.GetAllGridAsync();
+        lst.Add(contractGridAsync);
+
+        await Task.WhenAll(lst);
+
+        contractList = await contractGridAsync;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await localStorage.SetItemAsync<string>("last", "contracts");
+            isLoading = true;
+            seasonId = await localStorage.GetItemAsync<int>("season");
+
+            await FillData();
+
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            isLoading = false;
+            Snackbar.Add("No se pudo cargar la informacion. Intenta nuevamente.", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenDialog(int id)
+    {
+        var parameters = new DialogParameters<ContractForm> { { x => x.id, id } };
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.ExtraExtraLarge, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<ContractForm>("contract", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            isLoading = true;
+
+            await FillData();
+
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenFilterDialog()
+    {
+        var parameters = new DialogParameters<ContractForm>();
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, BackdropClick = false, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<ContractFilterForm>("Filter Contract", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            isLoading = true;
+
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async void OnDuplicate(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Duplicate",
+            "Confirm to duplicate contract?",
+            yesText: "Duplicate", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            isLoading = true;
+            var x = await _contractService.PostCopyAsync(id);
+
+            Show("Duplicate Success", Severity.Normal);
+
+            await FillData();
+
+            isLoading = false;
+        }
+
+        StateHasChanged();
+    }
+
+    private async void OnDelete(int id)
+    {
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Small, CloseButton = true, BackdropClick = false, FullWidth = true };
+
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete",
+            "Confirm to delete item?",
+            yesText: "Delete", cancelText: "Cancel", options: options);
+
+        if (result == true)
+        {
+            var x = await _contractService.DeleteAsync(id);
+            //contractList = await _contractService.GetAllAsync();
+            isLoading = true;
+
+            await FillData();
+
+            isLoading = false;
+            StateHasChanged();
+        }
+
+        StateHasChanged();
+    }
+
+    void SelectedItemsChanged(HashSet<ContractGrid> items)
+    {
+        selectedContract.Clear();
+
+        foreach (var item in items)
+        {
+            selectedContract.Add(item);
+        }
+    }
+
+    private Func<ContractGrid, object> _sortBy => x =>
+    {
+        if (_sortNameByLength)
+            return x.NroContract.Length;
+        else
+            return x.NroContract;
+    };
+
+    private Func<ContractGrid, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if(x.TransportCompany.Contains(_searchString, StringComparison.OrdinalIgnoreCase) || 
+            x.NroContract.Contains(_searchString, StringComparison.OrdinalIgnoreCase) || 
+            x.From.ToShortDateString().Contains(_searchString, StringComparison.OrdinalIgnoreCase) || 
+            x.Until.ToShortDateString().Contains(_searchString, StringComparison.OrdinalIgnoreCase) || 
+            x.Commodity.Contains(_searchString, StringComparison.OrdinalIgnoreCase) || 
+            x.POL.Contains(_searchString, StringComparison.OrdinalIgnoreCase) || 
+            x.POD.Contains(_searchString, StringComparison.OrdinalIgnoreCase) || 
+            x.RateType.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            x.TT.ToString().Contains(_searchString, StringComparison.OrdinalIgnoreCase)) return true;
+
+        return false;
+    };
+
+    private Snackbar _snackbar;
+
+    void Show(string msg, Severity severity)
+    {
+        Snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomCenter;
+        _snackbar = Snackbar.Add(msg, severity);
+    }
+}

@@ -1,0 +1,21 @@
+name: ci
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Restore
+        run: dotnet restore ArtemioBlazorWA.sln
+      - name: Build
+        run: dotnet build ArtemioBlazorWA.sln --no-restore --configuration Release
+      - name: Test
+        run: dotnet test ArtemioBlazorWA.Tests/ArtemioBlazorWA.Tests.csproj --no-build --configuration Release

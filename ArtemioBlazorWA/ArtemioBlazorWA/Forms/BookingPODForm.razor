@@ -1,0 +1,95 @@
+﻿@using ArtemioBlazorWA.Models;
+@using ArtemioBlazorWA.Services;
+
+@inject BookingPODService _bookingpodService
+@inject PortService _portService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            Update POD
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <FormSkeleton Rows="3" />
+        }
+        else
+        {
+<MudForm @ref="form">
+
+        <MudGrid>
+            <MudItem xs="12">
+                <MudSelect Variant="Variant.Outlined" T="int" Label="POD" @bind-Value="booking.PODId" Required="true" RequiredError="POD is required!"
+                           ToStringFunc="@(id => portList.FirstOrDefault(p => p.PortId == id)?.Port)">
+                    @foreach (var item in portList)
+                    {
+                        <MudSelectItem T="int" Value="@item.PortId">@item.Port</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField Variant="Variant.Outlined" T="string" Label="Comment" @bind-Value="booking.Comment" />
+            </MudItem>
+        </MudGrid>
+            </MudForm>
+            }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Disabled="@_processing" OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary">
+            @if (_processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Processing</MudText>
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public BookingPODModel booking { get; set; } = new BookingPODModel();
+
+    private List<PortModel> portList = new();
+
+    private bool _processing = false;
+    private MudForm? form;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        portList = await _portService.GetAllAsync();
+
+        StateHasChanged();
+        isLoading = false;
+    }
+
+    private async Task Submit()
+    {
+
+        if (form is not null)
+        {
+            await form.Validate();
+            if (!form.IsValid)
+            {
+                return;
+            }
+        }
+        var x = new BookingPODModel();
+
+        _processing = true;
+
+        x = await _bookingpodService.PostAsync(booking);
+
+        _processing = false;
+        MudDialog.Close(DialogResult.Ok(x.PODId));
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}
